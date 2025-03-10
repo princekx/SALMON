@@ -1,11 +1,27 @@
-#!/usr/bin/env /net/project/ukmo/scitools/opt_scitools/conda/deployments/default-2023_10_10/bin/python
-import datetime
+#!/usr/bin/env /net/project/ukmo/scitools/opt_scitools/conda/deployments/default-current/bin/python
+from datetime import datetime
 import sys
 sys.path.append('/home/h03/hadpx/MJO/Monitoring_new/BSISO')
 import time
 from mogreps import mogreps_process
 from glosea import glosea_process
 from display import bokeh_display
+
+# Function to read date from command line and create a datetime object
+def read_date_from_command_line():
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <date>")
+        print("Date format should be YYYY-MM-DD")
+        return
+
+    date_str = sys.argv[1]
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+        print(f"Successfully created datetime object: {date_obj}")
+    except ValueError as e:
+        print(f"Error: {e}. Please provide the date in YYYY-MM-DD format.")
+
+    return date_obj
 
 def do_mogreps(date):
     reader = mogreps_process.MOGProcess('mogreps')
@@ -29,8 +45,9 @@ def do_glosea(date):
 
 
 if __name__ == '__main__':
-    today = datetime.date.today()
-    yesterday = today - datetime.timedelta(days=1)
+    #today = datetime.date.today()
+    #yesterday = today - datetime.timedelta(days=1)
+    yesterday = read_date_from_command_line()
 
     '''
     # Define the start and end dates

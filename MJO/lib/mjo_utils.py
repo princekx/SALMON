@@ -14,8 +14,8 @@ from concurrent.futures import ProcessPoolExecutor, wait, ALL_COMPLETED
 import logging
 
 class MJOUtils:
-    def __init__(self, model):
-        self.config_values = {}
+    def __init__(self, model, config_values):
+        self.config_values = config_values
         self.num_prev_days = 201
         # 40 days of anlysis to be written out with the forecasts
         self.nanalysis2write = 40
@@ -26,20 +26,7 @@ class MJOUtils:
 
         # Navigate to the parent directory
         #parent_dir = os.getcwd()
-        self.parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/MJO'
-
-        # Specify the path to the config file in the parent directory
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-        print(config_path)
-
-        # Read the configuration file
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        # Get options in the 'analysis' section and store in the dictionary
-        for option, value in config.items(model):
-            self.config_values[option] = value
-        # print(self.config_values)
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/MJO'
 
     def region(self, coords):
         if len(coords) == 4:
@@ -239,7 +226,7 @@ class MJOUtils:
 
     def mjo_process_member(self, date, mem):
         #parent_dir = os.getcwd()
-        rmms_archive_dir = os.path.join(self.config_values['fcast_out_archive_dir'],
+        rmms_archive_dir = os.path.join(self.config_values['mogreps_mjo_archive_dir'],
                                         f'{date.strftime("%Y%m%d")}')
         if not os.path.exists(rmms_archive_dir):
             os.makedirs(rmms_archive_dir)

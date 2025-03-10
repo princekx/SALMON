@@ -24,10 +24,10 @@ class MJODisplay:
 
         # Navigate to the parent directory
         #parent_dir = os.getcwd()
-        parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/MJO'
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/MJO'
 
         # Specify the path to the config file in the parent directory
-        config_path = os.path.join(parent_dir, 'config.ini')
+        config_path = os.path.join(self.parent_dir, 'config.ini')
         print(config_path)
 
         # Read the configuration file

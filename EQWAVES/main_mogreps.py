@@ -1,7 +1,7 @@
-#!/usr/bin/env /net/project/ukmo/scitools/opt_scitools/conda/deployments/default-2023_10_10/bin/python
-import datetime
+#!/usr/bin/env /net/project/ukmo/scitools/opt_scitools/conda/deployments/default-current/bin/python
+from datetime import datetime
 import sys
-sys.path.append('/net/home/h03/hadpx/MJO/Monitoring_new/EQWAVES')
+sys.path.append('/home/users/prince.xavier/MJO/Monitoring_new/EQWAVES')
 from analysis import analysis_process
 from mogreps import mogreps_process
 from display import eqwaves_plot_bokeh
@@ -16,12 +16,12 @@ def collect_hour_argument():
     Returns:
         int: The hour value if valid, otherwise None.
     """
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 3:
         print("Usage: python main_mogreps.py <hour>")
         return None
 
-    hour_input = sys.argv[1]
-    print(hour_input)
+    date_str, hour_input = sys.argv[1], sys.argv[2]
+
     try:
         hour = int(hour_input)
     except ValueError:
@@ -32,7 +32,13 @@ def collect_hour_argument():
         print("Invalid hour value. Please enter 0, 6, 12, or 18.")
         return None
 
-    return hour
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+        print(f"Successfully created datetime object: {date_obj}")
+    except ValueError as e:
+        print(f"Error: {e}. Please provide the date in YYYY-MM-DD format.")
+
+    return date_obj, hour
 
 def do_mogreps(date):
     """
@@ -62,6 +68,7 @@ def do_mogreps(date):
     Data Processed.
     Waves computed.
     """
+
     # Retrieve analysis data
     reader = analysis_process.AnalysisProcess('analysis')
     status1 = reader.retrieve_analysis_data(date)
@@ -86,13 +93,12 @@ def do_mogreps(date):
 
 
 if __name__ == '__main__':
-    today = datetime.datetime.today()
-    yesterday = today - datetime.timedelta(days=1)
+    #today = datetime.datetime.today()
+    #yesterday = today - datetime.timedelta(days=1)
 
-    hour = collect_hour_argument()
-
-    #yesterday = datetime.datetime(2024, 3, 24, hour, 0)
-    yesterday = datetime.datetime(yesterday.year,
+    yesterday, hour = collect_hour_argument()
+    print(yesterday, hour)
+    yesterday = datetime(yesterday.year,
                                   yesterday.month,
                                   yesterday.day, hour, 0)
     print(yesterday)

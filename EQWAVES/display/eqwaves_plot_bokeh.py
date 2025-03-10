@@ -120,7 +120,7 @@ class EqWavesDisplay:
         plot = figure(height=height, width=width, x_range=x_range, y_range=y_range,
                       tools=["pan, reset, save, wheel_zoom, hover"],
                       x_axis_label='Longitude', y_axis_label='Latitude', aspect_scale=4,
-                      title=figure_tite)
+                      title=figure_tite, tooltips=[("Lat", "$y"), ("Lon", "$x"), ("Value", "@image")])
 
         plot.title.text_font_size = "14pt"
 
@@ -136,15 +136,16 @@ class EqWavesDisplay:
                    color_mapper=color_mapper_z)
         plot.add_layout(color_bar, 'below')
 
-        lons, lats = np.meshgrid(contour_var.coord('longitude').points, contour_var.coord('latitude').points)
-        contour_levels = np.arange(0.4, 1.2, 0.2)
-        contour_renderer = plot.contour(lons, lats, contour_var.data, contour_levels, fill_color=None,
-                                        fill_alpha=0.3,
-                                        line_color=Bokeh8, line_alpha=0.5, line_width=5)
-        colorbar = contour_renderer.construct_color_bar(major_label_text_font_size="12pt",
-                                                        orientation="horizontal", location=(-500, -135), width=400,
-                                                        title=contour_cbar_title, title_text_font_size="12pt")
-        plot.add_layout(colorbar, "right")
+        if contour_var is not None:
+            lons, lats = np.meshgrid(contour_var.coord('longitude').points, contour_var.coord('latitude').points)
+            contour_levels = np.arange(0.4, 1.2, 0.2)
+            contour_renderer = plot.contour(lons, lats, contour_var.data, contour_levels, fill_color=None,
+                                            fill_alpha=0.3,
+                                            line_color=Bokeh8, line_alpha=0.5, line_width=5)
+            colorbar = contour_renderer.construct_color_bar(major_label_text_font_size="12pt",
+                                                            orientation="horizontal", location=(-500, -135), width=400,
+                                                            title=contour_cbar_title, title_text_font_size="12pt")
+            plot.add_layout(colorbar, "right")
 
         with open(self.map_outline_json_file, "r") as f:
             countries = GeoJSONDataSource(geojson=f.read())

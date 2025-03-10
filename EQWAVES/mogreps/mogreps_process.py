@@ -432,7 +432,7 @@ class MOGProcess:
                                                      * np.squeeze(d[m, :]) * dlat, axis=-1) / (dsq[m] * y0)
                 qf_Kel[f1p:f2p, :, k1n:k2n] = np.sum(qf[f1p:f2p, :, k1n:k2n, :] \
                                                      * np.squeeze(d[m, :]) * dlat, axis=-1) / (dsq[m] * y0)
-            # For westward moving waves/usr/bin/sbatch --time=360 --ntasks=8 --mem=40G --output=eqwaves_new.log --partition=rhel7 /net/home/h03/hadpx/MJO/Monitoring_new/EQWAVES/main_bsiso.py
+            # For westward moving waves
             qf_mode[m, f1n:f2n, :, k1n:k2n] = np.sum(qf[f1n:f2n, :, k1n:k2n, :] \
                                                      * np.squeeze(d[m, :]) * dlat, axis=-1) / (dsq[m] * y0)
             qf_mode[m, f1p:f2p, :, k1p:k2p] = np.sum(qf[f1p:f2p, :, k1p:k2p, :] \

@@ -1,13 +1,32 @@
-#!/usr/bin/env /net/project/ukmo/scitools/opt_scitools/conda/deployments/default-2023_10_10/bin/python
-import datetime
+#!/usr/bin/env /data/apps/sss/environments/default-2024_09_02/bin/python
+from datetime import datetime
 import sys
-sys.path.append('/home/h03/hadpx/MJO/Monitoring_new/MJO')
+sys.path.append('/home/users/prince.xavier/MJO/SALMON/MJO')
 import time
 from analysis import analysis_process
 from mogreps import mogreps_process
 from glosea import glosea_process
 from lib import mjo_utils
 from display import bokeh_display
+
+
+
+# Function to read date from command line and create a datetime object
+def read_date_from_command_line():
+    if len(sys.argv) != 2:
+        print("Usage: python script.py <date>")
+        print("Date format should be YYYY-MM-DD")
+        return
+
+    date_str = sys.argv[1]
+    try:
+        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+        print(f"Successfully created datetime object: {date_obj}")
+    except ValueError as e:
+        print(f"Error: {e}. Please provide the date in YYYY-MM-DD format.")
+
+    return date_obj
+
 def do_analysis(date):
     #
     # Usage:
@@ -76,22 +95,23 @@ def do_glosea(date):
     rmm_display.bokeh_rmm_plot(date, members, title_prefix='GLOSEA')
 
 if __name__ == '__main__':
-    today = datetime.date.today()
-    yesterday = today - datetime.timedelta(days=1)
-
+    #today = datetime.date.today()
+    #yesterday = today - datetime.timedelta(days=1)
     #yesterday = datetime.datetime(2024, 1, 17)
+
+    yesterday = read_date_from_command_line()
 
     # MOGREPS
     do_analysis(yesterday)
-    time.sleep(60)  # Wait for 60 seconds
-    do_analysis(yesterday)
-    time.sleep(60)  # Wait for 60 seconds
+    #time.sleep(60)  # Wait for 60 seconds
+    #do_analysis(yesterday)
+    #time.sleep(60)  # Wait for 60 seconds
 
 
     # a second run to make sure all parallel jobs are completed
-    do_mogreps(yesterday)
-    time.sleep(60)  # Wait for 60 seconds
-    do_mogreps(yesterday)
+    #do_mogreps(yesterday)
+    #time.sleep(60)  # Wait for 60 seconds
+    #do_mogreps(yesterday)
 
     # GLOSEA
     #do_analysis(yesterday)

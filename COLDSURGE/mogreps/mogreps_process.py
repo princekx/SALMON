@@ -25,7 +25,7 @@ class MOGProcess:
         self.config_values = {}
 
         # Navigate to the parent directory
-        self.parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/COLDSURGE'
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/COLDSURGE'
 
         # Specify the path to the config file in the parent directory
         config_path = os.path.join(self.parent_dir, 'config.ini')

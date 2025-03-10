@@ -20,36 +20,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MOGProcess:
-
-    def __init__(self, model):
-        self.config_values = {}
+    def __init__(self, config_values_analysis, config_values):
+        self.config_values_analysis = config_values_analysis
+        self.config_values = config_values
         self.num_prev_days = 201
-        self.parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/MJO'
-
-        #def read_config_file(self, model):
-
-        # Navigate to the parent directory
-        #parent_dir = os.getcwd()
-
-
-        # Specify the path to the config file in the parent directory
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-        print(config_path)
-
-        # Read the configuration file
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        # Get options in the 'model' section and store in the dictionary
-        for option, value in config.items(model):
-            self.config_values[option] = value
-        print(self.config_values)
-
-        # We need analysis config details for concating data
-        self.config_values_analysis = {}
-        for option, value in config.items('analysis'):
-            self.config_values_analysis[option] = value
-        print(self.config_values_analysis)
 
     def get_all_members(self, hr):
         if hr == 12:
@@ -59,10 +33,10 @@ class MOGProcess:
 
     def retrieve_fc_data_parallel(self, date, hr, fc, digit2_mem):
         print('In retrieve_fc_data_parallel()')
-        moosedir = os.path.join(self.config_values['moose_dir'], f'{date.strftime("%Y%m")}.pp')
+        moosedir = os.path.join(self.config_values['mogreps_moose_dir'], f'{date.strftime("%Y%m")}.pp')
         digit3_mem = '035' if (hr == 18 and digit2_mem == '00') else str('%03d' % int(digit2_mem))
 
-        remote_data_dir = os.path.join(self.config_values['forecast_data_dir'],
+        remote_data_dir = os.path.join(self.config_values['mogreps_raw_dir'],
                                        date.strftime("%Y%m%d"), digit3_mem)
         if not os.path.exists(remote_data_dir):
             os.makedirs(remote_data_dir)
@@ -76,7 +50,7 @@ class MOGProcess:
         outfile = f'englaa_pd{fct}.pp'
 
         # Generate a unique query file
-        local_query_file1 = os.path.join(self.config_values['dummy_queryfiles_dir'],
+        local_query_file1 = os.path.join(self.config_values['mogreps_dummy_queryfiles_dir'],
                                          f'localquery_{uuid.uuid1()}')
         self.create_query_file(local_query_file1, filemoose, fct)
 
@@ -85,7 +59,7 @@ class MOGProcess:
 
         if not outfile_status:
             print('EXECCCC')
-            command = f'/opt/moose-client-wrapper/bin/moo select {local_query_file1} {moosedir} {os.path.join(remote_data_dir, outfile)}'
+            command = f'/opt/moose-client-wrapper/bin/moo select --fill-gaps {local_query_file1} {moosedir} {os.path.join(remote_data_dir, outfile)}'
             logger.info('Executing command: %s', command)
 
             try:
@@ -102,7 +76,7 @@ class MOGProcess:
 
     def check_if_all_data_exist(self, date, hr, fc, digit2_mem):
         digit3_mem = str('%03d' % int(digit2_mem))
-        remote_data_dir = os.path.join(self.config_values['forecast_data_dir'],
+        remote_data_dir = os.path.join(self.config_values['mogreps_raw_dir'],
                                        date.strftime("%Y%m%d"), digit3_mem)
         fct = f'{fc:03d}'
         outfile = f'englaa_pd{fct}.pp'
@@ -111,7 +85,7 @@ class MOGProcess:
         return outfile_status
 
     def create_query_file(self, local_query_file1, filemoose, fct):
-        query_file = self.config_values['queryfile']
+        query_file = self.config_values['mogreps_combined_queryfile']
 
         replacements = {'fctime': fct, 'filemoose': filemoose}
         with open(query_file) as query_infile, open(local_query_file1, 'w') as query_outfile:
@@ -120,7 +94,7 @@ class MOGProcess:
                     line = line.replace(src, target)
                 query_outfile.write(line)
 
-    def retrieve_mogreps_data(self, date):
+    def retrieve_mogreps_data(self, date, parallel=True):
         print('Retrieving data for date:', date)
 
         hr_list = [12, 18]
@@ -133,21 +107,24 @@ class MOGProcess:
 
         #for task in tasks:
         #    self.retrieve_fc_data_parallel(*task)
+        if parallel:
+            # Use ThreadPoolExecutor to run tasks in parallel
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # Submit tasks to the executor
+                futures = [executor.submit(self.retrieve_fc_data_parallel, *task) for task in tasks]
 
-        # Use ThreadPoolExecutor to run tasks in parallel
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            # Submit tasks to the executor
-            futures = [executor.submit(self.retrieve_fc_data_parallel, *task) for task in tasks]
+                # Wait for all tasks to complete
+                concurrent.futures.wait(futures)
 
             # Wait for all tasks to complete
-            concurrent.futures.wait(futures)
+            #print(concurrent.futures.as_completed(futures))
 
-        # Wait for all tasks to complete
-        #print(concurrent.futures.as_completed(futures))
+            file_present = all([self.check_if_all_data_exist(*task) for task in tasks ])
 
-        file_present = all([self.check_if_all_data_exist(*task) for task in tasks ])
-
-        return file_present
+            return file_present
+        else:
+            for task in tasks:
+                self.retrieve_fc_data_parallel(*task)
 
 
 
@@ -263,7 +240,7 @@ class MOGProcess:
         return cat_cube
 
     def process_member_combine_data(self, mem, date, fc_times, olr_analysis, u850_analysis, u200_analysis):
-        mog_files = [os.path.join(self.config_values['forecast_data_dir'],
+        mog_files = [os.path.join(self.config_values['mogreps_raw_dir'],
                                   date.strftime("%Y%m%d"), mem, f'englaa_pd{fct}.pp')
                      for fct in fc_times]
         mog_files.sort()

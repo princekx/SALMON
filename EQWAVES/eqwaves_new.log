@@ -2764,8 +2764,8 @@ Traceback (most recent call last):
     do_mogreps(yesterday)
   File "/var/spool/slurmd/job685802/slurm_script", line 23, in do_mogreps
     reader.process_mogreps_forecast_data(date)
-  File "/net/home/h03/hadpx/MJO/Monitoring_new/EQWAVES/mogreps/mogreps_process.py", line 657, in process_mogreps_forecast_data
+  File "/home/users/prince.xavier/MJO/Monitoring_new/EQWAVES/mogreps/mogreps_process.py", line 657, in process_mogreps_forecast_data
     all_tasks_completed = all(result.successful() for result in results.get())
-  File "/net/home/h03/hadpx/MJO/Monitoring_new/EQWAVES/mogreps/mogreps_process.py", line 657, in <genexpr>
+  File "/home/users/prince.xavier/MJO/Monitoring_new/EQWAVES/mogreps/mogreps_process.py", line 657, in <genexpr>
     all_tasks_completed = all(result.successful() for result in results.get())
 AttributeError: 'NoneType' object has no attribute 'successful'
