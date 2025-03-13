@@ -111,8 +111,6 @@ if __name__ == '__main__':
             mjo_proc = mjo_utils.MJOUtils(model, config_values)
             status3 = mjo_proc.run_mjo_process(date, members, model=model, parallel=False)
 
-            #print(f'run_parallel_mjo_process: {status3}')
-
             rmm_display = bokeh_display.MJODisplay(model, config_values)
             rmm_display.bokeh_rmm_plot(date, members, title_prefix='MOGREPS')
 
@@ -129,5 +127,8 @@ if __name__ == '__main__':
             mjo_proc = mjo_utils.MJOUtils(model, config_values)
             status3 = mjo_proc.run_mjo_process(date, members, model=model, parallel=False)
             print(f'run_parallel_mjo_process: {status3}')
+
+            rmm_display = bokeh_display.MJODisplay(model, config_values)
+            rmm_display.bokeh_rmm_plot(date, members, title_prefix='GLOSEA')
 
 
