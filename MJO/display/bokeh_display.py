@@ -15,32 +15,28 @@ import warnings
 warnings.simplefilter("ignore")
 
 class MJODisplay:
-    def __init__(self, model):
-        self.model = model
-        self.config_values = {}
+    def __init__(self, model, config_values):
+        self.config_values = config_values
         self.num_prev_days = 201
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/MJO'
+
+        self.model = model
         # 40 days of anlysis to be written out with the forecasts
         self.nanalysis2write = 40
 
-        # Navigate to the parent directory
-        #parent_dir = os.getcwd()
-        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/MJO'
-
-        # Specify the path to the config file in the parent directory
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-        print(config_path)
-
-        # Read the configuration file
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        # Get options in the 'analysis' section and store in the dictionary
-        for option, value in config.items(model):
-            self.config_values[option] = value
-        # print(self.config_values)
     def write_dates_json(self, date):
+        if self.model == 'mogreps':
+            plot_dir = self.config_values['mogreps_mjo_plot_ens']
+        elif self.model == 'glosea':
+            plot_dir = self.config_values['glosea_mjo_plot_ens']
 
-        json_file = os.path.join(self.config_values['plot_ens'], f'{self.model}_dates.json')
+        # Specify the output file
+        if not os.path.exists(plot_dir):
+            os.makedirs(plot_dir)
+
+        json_file = os.path.join(plot_dir, f'{self.model}_dates.json')
+
+
         print(json_file)
         # Add a new date to the list
         new_date = date.strftime('%Y%m%d')
@@ -148,8 +144,15 @@ class MJODisplay:
         return plot
 
     def bokeh_rmm_plot(self, date, members, title_prefix='MODEL'):
-        rmms_archive_dir = os.path.join(self.config_values['fcast_out_archive_dir'],
-                                        f'{date.strftime("%Y%m%d")}')
+        print(self.config_values, 'HERE!!!')
+        if self.model == 'mogreps':
+            print(self.config_values)
+            rmms_archive_dir = os.path.join(self.config_values['mogreps_mjo_archive_dir'],
+                                            f'{date.strftime("%Y%m%d")}')
+        elif self.model == 'glosea':
+            rmms_archive_dir = os.path.join(self.config_values['glosea_mjo_archive_dir'],
+                                            f'{date.strftime("%Y%m%d")}')
+
         if not os.path.exists(rmms_archive_dir):
             os.makedirs(rmms_archive_dir)
 
@@ -158,6 +161,7 @@ class MJODisplay:
                           for mem in members]
         existing_files = [file_name for file_name in rmm_file_names if os.path.exists(file_name)]
         print(f'{len(existing_files)} RMM files found. Trying Bokeh plot.')
+
         # Read a dummy to get the analysis
         df = pd.read_csv(existing_files[0])
         df['date'] = pd.to_datetime(df[['year', 'month', 'day']]).dt.strftime('%Y-%m-%d')
@@ -203,11 +207,16 @@ class MJODisplay:
         plot.circle('rmm1', 'rmm2', source=ens_mean_df, name="analysis_dots", color='blue', radius=0.05,
                         alpha=0.3)
 
-        # Specify the output file
-        if not os.path.exists(self.config_values['plot_ens']):
-            os.makedirs(self.config_values['plot_ens'])
+        if self.model == 'mogreps':
+            plot_dir = self.config_values['mogreps_mjo_plot_ens']
+        elif self.model == 'glosea':
+            plot_dir = self.config_values['glosea_mjo_plot_ens']
 
-        plot_file = os.path.join(self.config_values['plot_ens'],
+        # Specify the output file
+        if not os.path.exists(plot_dir):
+            os.makedirs(plot_dir)
+
+        plot_file = os.path.join(plot_dir,
                                  f'{title_prefix}_{date.strftime("%Y%m%d")}.html')
         output_file(plot_file)
         save(plot)

@@ -104,54 +104,30 @@ if __name__ == '__main__':
             print(config_values)
 
             reader = mogreps_process.MOGProcess(config_values_analysis, config_values)
-            status1 = reader.retrieve_mogreps_data(date, parallel=True)
+            status1 = reader.retrieve_mogreps_data(date, parallel=False)
+            status1 = reader.combine_201_days_analysis_and_forecast_data(date, members, parallel=False)
             print(status1)
 
             mjo_proc = mjo_utils.MJOUtils(model, config_values)
-            status3 = mjo_proc.run_parallel_mjo_process(date, members)
+            status3 = mjo_proc.run_mjo_process(date, members, model=model, parallel=False)
 
-            print(f'run_parallel_mjo_process: {status3}')
+            #print(f'run_parallel_mjo_process: {status3}')
+
+            rmm_display = bokeh_display.MJODisplay(model, config_values)
+            rmm_display.bokeh_rmm_plot(date, members, title_prefix='MOGREPS')
 
         if model == 'glosea':
             config_values = load_config(model=model)
             print(config_values)
             reader = glosea_process.GLOProcess(config_values_analysis, config_values)
             reader.retrieve_glosea_data(date)
-    sys.exit()
-    #today = datetime.date.today()
-    #yesterday = today - datetime.timedelta(days=1)
-    #yesterday = datetime.datetime(2024, 1, 17)
 
-    yesterday = read_date_from_command_line()
+            # All ensemble members
+            members = [str('%03d' % mem) for mem in range(4)]
+            print(members)
 
-    # MOGREPS
-    #do_analysis(yesterday)
-    #time.sleep(60)  # Wait for 60 seconds
-    #do_analysis(yesterday)
-    #time.sleep(60)  # Wait for 60 seconds
-
-
-    # a second run to make sure all parallel jobs are completed
-    do_mogreps(yesterday)
-    #time.sleep(60)  # Wait for 60 seconds
-    #do_mogreps(yesterday)
-
-    # GLOSEA
-    #do_analysis(yesterday)
-    #do_glosea(yesterday)
-    #time.sleep(60)  # Wait for 60 seconds
-    #do_glosea(yesterday)
-    '''
-    start_date = datetime.date(2024, 1, 31)
-    end_date = datetime.date(2024, 2, 4)
-
-    current_date = start_date
-    while current_date <= end_date:
-        # Glosea
-        do_analysis(current_date)
-        do_mogreps(current_date)
-        do_mogreps(current_date)
-        current_date += datetime.timedelta(days=1)
-    '''
+            mjo_proc = mjo_utils.MJOUtils(model, config_values)
+            status3 = mjo_proc.run_mjo_process(date, members, model=model, parallel=False)
+            print(f'run_parallel_mjo_process: {status3}')
 
 

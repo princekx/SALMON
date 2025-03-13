@@ -5,19 +5,19 @@ analysis:
   analysis_combined_queryfile: /home/users/prince.xavier/MJO/SALMON/RETRIEVALS/analysis_combined.query
   mjo:
     analysis_mjo_processed_dir: /data/scratch/prince.xavier/SALMON/processed_SEA_data/analysis/
-    analysis_mjo_rmm_archive_dir: /data/users/prince.xavier/SALMON/analysis/mjo/rmms/
+    analysis_mjo_rmm_archive_dir: /data/users/prince.xavier/SALMON/processed_SEA_data/analysis/mjo/rmms/
   eqwaves:
     analysis_eqwaves_processed_dir: /data/scratch/prince.xavier/SALMON/processed_SEA_data/analysis/eqwaves
 
 mogreps:
-  mogreps_dummy_queryfiles_dir: /data/scratch/prince.xavier/SEA_monitoring/temp
+  mogreps_dummy_queryfiles_dir: /data/scratch/prince.xavier/SALMON/temp
   mogreps_moose_dir: moose:/opfc/atm/mogreps-g/prods/
   mogreps_raw_dir: /data/scratch/prince.xavier/SALMON/raw_data/mogreps/mogreps_bucket
   mogreps_combined_queryfile: /home/users/prince.xavier/MJO/Monitoring_new/RETRIEVALS/mogreps_combined.query
   mjo:
-    mogreps_mjo_processed_dir: /data/scratch/prince.xavier/SALMON/processed_SEA_data/mogreps/MJO
-    mogreps_mjo_archive_dir: /project/MJO_GCSS/SEA_monitoring/processed_MJO_data/mogreps/rmms_new/
-    mogreps_mjo_plot_ens: /project/MJO_GCSS/SEA_monitoring/processed_MJO_data/mogreps/plot_ens_new
+    mogreps_mjo_processed_dir: /data/scratch/prince.xavier/SALMON/processed_SEA_data/mogreps/mjo
+    mogreps_mjo_archive_dir: /data/users/prince.xavier/SALMON/processed_SEA_data/mogreps/mjo/rmms_new/
+    mogreps_mjo_plot_ens: /data/users/prince.xavier/SALMON/processed_SEA_data/mogreps/mjo/plot_ens_new
   eqwaves:
     mogreps_eqwaves_processed_dir: /data/scratch/prince.xavier/SEA_monitoring/processed_SEA_data/mogreps/eqwaves
     mogreps_eqwaves_plot_ens: /project/MJO_GCSS/SEA_monitoring/processed_EQW_data/mogreps/plot_ens_new
@@ -32,11 +32,11 @@ mogreps:
 glosea:
   glosea_dummy_queryfiles_dir: /data/scratch/prince.xavier/SALMON/temp
   glosea_combined_queryfile: /home/users/prince.xavier/MJO/Monitoring_new/RETRIEVALS/glosea_combined.query
-  glosea_raw_dir: /data/scratch/prince.xavier/SALMON/raw_data/glosea/
+  glosea_raw_dir: /data/scratch/prince.xavier/SALMON/raw_data/glosea/glosea_bucket
   mjo:
-    glosea_mjo_processed_dir: /data/scratch/prince.xavier/SEA_monitoring/processed_SEA_data/glosea/MJO
-    glosea_mjo_archive_dir: /project/MJO_GCSS/SEA_monitoring/processed_MJO_data/glosea/rmms/
-    glosea_mjo_plot_ens: /project/MJO_GCSS/SEA_monitoring/processed_MJO_data/glosea/plot_ens_new
+    glosea_mjo_processed_dir: /data/scratch/prince.xavier/SALMON/processed_SEA_data/glosea/mjo
+    glosea_mjo_archive_dir: /data/users/prince.xavier/SALMON/processed_SEA_data/glosea/mjo/rmms_new/
+    glosea_mjo_plot_ens: /data/users/prince.xavier/SALMON/processed_SEA_data/glosea/mjo/plot_ens_new
   cs:
     glosea_cs_processed_dir: /data/scratch/prince.xavier/SEA_monitoring/processed_SEA_data/glosea/coldsurge
     glosea_cs_plot_ens: /project/MJO_GCSS/SEA_monitoring/processed_CS_data/glosea/plot_ens_new

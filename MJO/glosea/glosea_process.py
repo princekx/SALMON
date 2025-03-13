@@ -22,6 +22,7 @@ class GLOProcess:
         self.config_values = config_values
         self.num_prev_days = 201
         self.nforecasts = 30
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/MJO'
 
     def command_helper(self, command):
         print(command)
@@ -176,7 +177,7 @@ class GLOProcess:
             os.makedirs(gs_out_dir)
 
         # get all members
-        command = '%s/%s_*_%s_*.pp' % (os.path.join(self.config_values['glosea_mjo_processed_dir'],
+        command = '%s/%s_*_%s_*.pp' % (os.path.join(self.config_values['glosea_raw_dir'],
                                                     suite_dic[prod], date_label), prod, date_label)
         files = glob.glob(command)
         members = list(set([file.split('_')[-1].split('.')[0] for file in files]))
@@ -208,7 +209,7 @@ class GLOProcess:
                 print(concated_file)
                 if not os.path.exists(concated_file):
                     command = '%s/%s_*_%s_*_%s.pp' % (
-                        os.path.join(self.config_values['glosea_mjo_processed_dir'],
+                        os.path.join(self.config_values['glosea_raw_dir'],
                                      suite_dic[prod], date_label), prod, date_label, mem)
                     member_files = glob.glob(command)
                     member_files.sort()

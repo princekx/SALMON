@@ -24,6 +24,7 @@ class MOGProcess:
         self.config_values_analysis = config_values_analysis
         self.config_values = config_values
         self.num_prev_days = 201
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/MJO'
 
     def get_all_members(self, hr):
         if hr == 12:
@@ -49,9 +50,14 @@ class MOGProcess:
         filemoose = f'prods_op_mogreps-g_{date.strftime("%Y%m%d")}_{hr}_{digit2_mem}_{fct}.pp'
         outfile = f'englaa_pd{fct}.pp'
 
+        local_dummy_query_dir = self.config_values['mogreps_dummy_queryfiles_dir']
+        if not os.path.exists(local_dummy_query_dir):
+            os.makedirs(local_dummy_query_dir)
+
         # Generate a unique query file
-        local_query_file1 = os.path.join(self.config_values['mogreps_dummy_queryfiles_dir'],
+        local_query_file1 = os.path.join(local_dummy_query_dir,
                                          f'localquery_{uuid.uuid1()}')
+
         self.create_query_file(local_query_file1, filemoose, fct)
 
         outfile_path = os.path.join(remote_data_dir, outfile)
@@ -181,8 +187,9 @@ class MOGProcess:
         # Equalise attributes
         iris.util.equalise_attributes(cubes)
         # Merge was failing because of some stupid cell_methods mismatch (Iris is evil!)
-
+        print(len(cubes))
         cubes = iris.cube.CubeList(cubes).merge_cube()
+
         return self.regrid2obs(cubes)
 
     def read_winds_correctly(self, data_files, varname, pressure_level=None):
@@ -215,7 +222,7 @@ class MOGProcess:
 
     def load_analysis_cubes(self, date):
         olr_mean_analysis_201d_file, u850_mean_analysis_201d_file, u200_mean_analysis_201d_file = (
-            os.path.join(self.config_values_analysis['analysis_processed_dir'], varname,
+            os.path.join(self.config_values_analysis['analysis_mjo_processed_dir'], varname,
                          f'{varname}_mean_nrt_{date.strftime("%Y%m%d")}.nc')
             for varname in ['olr', 'u850', 'u200'])
 
@@ -251,7 +258,8 @@ class MOGProcess:
                                        ('u850', u850_analysis),
                                        ('u200', u200_analysis)]:
             concated_dir = os.path.join(
-                self.config_values['forecast_out_dir'], varname)
+                self.config_values['mogreps_mjo_processed_dir'], varname)
+
             if not os.path.exists(concated_dir):
                 os.makedirs(concated_dir)
 
@@ -276,17 +284,22 @@ class MOGProcess:
             else:
                 print(f'{concated_file} exits. Skip.')
 
-    def combine_201_days_analysis_and_forecast_data(self, date, members):
+    def combine_201_days_analysis_and_forecast_data(self, date, members, parallel=True):
         print('Concat 201 days of analysis and forecast data.')
         olr_analysis, u850_analysis, u200_analysis = self.load_analysis_cubes(date)
         fc_times = [str('%03d' % fct) for fct in np.arange(24, 174, 24)]
 
-        with concurrent.futures.ProcessPoolExecutor() as executor:
-            futures = {executor.submit(self.process_member_combine_data, mem,
-                                       date, fc_times, olr_analysis,
-                                       u850_analysis, u200_analysis): mem for mem in members}
+        if parallel:
+            with concurrent.futures.ProcessPoolExecutor() as executor:
+                futures = {executor.submit(self.process_member_combine_data, mem,
+                                           date, fc_times, olr_analysis,
+                                           u850_analysis, u200_analysis): mem for mem in members}
 
-        concurrent.futures.wait(futures)
+            concurrent.futures.wait(futures)
+        else:
+            for mem in members:
+                self.process_member_combine_data(mem,date, fc_times, olr_analysis,
+                u850_analysis, u200_analysis)
 
 
         # Check if all tasks are completed successfully

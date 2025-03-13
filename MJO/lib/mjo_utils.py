@@ -224,10 +224,15 @@ class MJOUtils:
         df.to_csv(rmm_file_name, index=False)
         print(f'DataFrame has been successfully written to {rmm_file_name}')
 
-    def mjo_process_member(self, date, mem):
+    def mjo_process_member(self, model, date, mem):
         #parent_dir = os.getcwd()
-        rmms_archive_dir = os.path.join(self.config_values['mogreps_mjo_archive_dir'],
-                                        f'{date.strftime("%Y%m%d")}')
+        if model == 'mogreps':
+            rmms_archive_dir = os.path.join(self.config_values['mogreps_mjo_archive_dir'],
+                                            f'{date.strftime("%Y%m%d")}')
+        elif model == 'glosea':
+            rmms_archive_dir = os.path.join(self.config_values['glosea_mjo_archive_dir'],
+                                            f'{date.strftime("%Y%m%d")}')
+
         if not os.path.exists(rmms_archive_dir):
             os.makedirs(rmms_archive_dir)
 
@@ -236,8 +241,13 @@ class MJOUtils:
 
             anom_120_filenames = {}
             for varname in ['olr', 'u850', 'u200']:
-                forecast_out_dir = os.path.join(
-                    self.config_values['forecast_out_dir'], varname)
+                if model == 'mogreps':
+                    forecast_out_dir = os.path.join(
+                        self.config_values['mogreps_mjo_processed_dir'], varname)
+                elif model == 'glosea':
+                    forecast_out_dir = os.path.join(
+                        self.config_values['glosea_mjo_processed_dir'], varname)
+
                 sm120d_outfile = os.path.join(forecast_out_dir,
                                               f'{varname}_120dm_40sn_nrt_{date.strftime("%Y%m%d")}_{mem}.nc')
 
@@ -290,11 +300,11 @@ class MJOUtils:
         else:
             print(f'{rmm_file_name} exists. Skip RMM calculation.')
 
-    def run_parallel_mjo_process(self, date, members, parallel=True):
+    def run_mjo_process(self, date, members, parallel=True, model='mogreps'):
 
         if parallel:
             with concurrent.futures.ProcessPoolExecutor() as executor:
-                futures = {executor.submit(self.mjo_process_member, date, mem): mem for mem in members}
+                futures = {executor.submit(self.mjo_process_member, model, date, mem): mem for mem in members}
 
                 concurrent.futures.wait(futures)
 
@@ -310,8 +320,7 @@ class MJOUtils:
             return all_tasks_completed
         else:
             # Running in serial mode
-            tasks = [(date, mem) for mem in members]
+            tasks = [(model, date, mem) for mem in members]
             for task in tasks:
-                print(task)
                 self.mjo_process_member(*task)
 
