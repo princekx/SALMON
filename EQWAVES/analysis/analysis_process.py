@@ -16,28 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 class AnalysisProcess:
-    def __init__(self, model):
-        self.config_values = {}
-        self.parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/EQWAVES'
+    def __init__(self, config_values):
+        self.config_values = config_values
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/EQWAVES'
         self.ntimes_total = 360
         self.ntimes_analysis = 332
         self.ntimes_forecast = 28
         self.latmax = 24
-        # Read the configuration file
-        self.read_config_file(model)
         self.ref_grid = self.create_cube().intersection(latitude=(-self.latmax, self.latmax))
 
-    def read_config_file(self, model):
-        # Specify the path to the config file in the parent directory
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-
-        # Read the configuration file
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        # Get options in the 'analysis' section and store in the dictionary
-        for option, value in config.items(model):
-            self.config_values[option] = value
 
     def create_cube(self, latitudes=(-90.5, 90.5), longitudes=(-0.5, 359.5), spacing=1):
         """
@@ -89,7 +76,7 @@ class AnalysisProcess:
 
         return cube
     def create_query_file(self, local_query_file1, filemoose, fct):
-        query_file = self.config_values['analysis_query_file']
+        query_file = self.config_values['analysis_combined_queryfile']
 
         replacements = {'fctime': fct, 'filemoose': filemoose}
         with open(query_file) as query_infile, open(local_query_file1, 'w') as query_outfile:
@@ -131,7 +118,7 @@ class AnalysisProcess:
             if os.path.exists(outfile_path) and os.path.getsize(outfile_path) > 0:
                 logger.info(f'{outfile_path} exists. Skipping retrieval.')
             else:
-                command = f'/opt/moose-client-wrapper/bin/moo select {local_query_file1} {moose_dir} {outfile_path}'
+                command = f'/opt/moose-client-wrapper/bin/moo select --fill-gaps {local_query_file1} {moose_dir} {outfile_path}'
                 logger.info(command)
                 subprocess.run(command, shell=True, check=True)
         except subprocess.CalledProcessError:

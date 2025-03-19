@@ -14,32 +14,18 @@ from bokeh.palettes import GnBu9, Magma6, Greys256, Greys9, GnBu9, RdPu9, TolRai
 from .bokeh_vector import vector
 
 class ColdSurgeDisplay:
-    def __init__(self, model):
+    def __init__(self, model, config_values):
+        self.config_values = config_values
         self.model = model
-        self.config_values = {}
-        self.num_prev_days = 201
-        # 40 days of anlysis to be written out with the forecasts
-        self.nanalysis2write = 40
 
         # Navigate to the parent directory
-        self.parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/COLDSURGE'
-
-        # Specify the path to the config file in the parent directory
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-        print(config_path)
-
-        # Read the configuration file
-        config = configparser.ConfigParser()
-        config.read(config_path)
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/COLDSURGE'
 
         # Get options in the 'analysis' section and store in the dictionary
-        for option, value in config.items(model):
-            self.config_values[option] = value
-
-        if model == 'glosea':
+        if self.model == 'glosea':
             self.xSkip = 2
             self.ySkip = 2
-        elif model == 'mogreps':
+        elif self.model == 'mogreps':
             self.xSkip = 5
             self.ySkip = 5
 
@@ -158,7 +144,7 @@ class ColdSurgeDisplay:
 
 
     def get_file_name(self, date, varname):
-        concated_dir = os.path.join(self.config_values['forecast_out_dir'], varname)
+        concated_dir = os.path.join(self.config_values[f'{self.model}_cs_processed_dir'], varname)
         file_name = os.path.join(concated_dir,
                                         f'{varname}_ColdSurge_24h_allMember_{date.strftime("%Y%m%d")}.nc')
         return file_name
@@ -246,7 +232,7 @@ class ColdSurgeDisplay:
             plot.add_layout(Title(text=title, text_font_size="12pt"), 'above')
 
             #show(plot)
-            html_file_dir = os.path.join(self.config_values['plot_ens'], date_label)
+            html_file_dir = os.path.join(self.config_values[f'{self.model}_cs_plot_ens'], date_label)
             if not os.path.exists(html_file_dir):
                 os.makedirs(html_file_dir)
 
@@ -256,7 +242,7 @@ class ColdSurgeDisplay:
             save(plot)
             print('Plotted %s' % html_file)
 
-        json_file = os.path.join(self.config_values['plot_ens'], f'{self.model}_ensmean_plot_dates.json')
+        json_file = os.path.join(self.config_values[f'{self.model}_cs_plot_ens'], f'{self.model}_ensmean_plot_dates.json')
         self.write_dates_json(date, json_file)
 
 
@@ -335,7 +321,7 @@ class ColdSurgeDisplay:
                 plot.add_layout(Title(text=subtitle, text_font_style="italic"), 'above')
                 plot.add_layout(Title(text=title, text_font_size="12pt"), 'above')
 
-                html_file_dir = os.path.join(self.config_values['plot_ens'], date_label)
+                html_file_dir = os.path.join(self.config_values[f'{self.model}_cs_plot_ens'], date_label)
                 if not os.path.exists(html_file_dir):
                     os.makedirs(html_file_dir)
 
@@ -347,7 +333,7 @@ class ColdSurgeDisplay:
                 save(plot)
                 print('Plotted %s' % html_file)
 
-            json_file = os.path.join(self.config_values['plot_ens'], f'{self.model}_ProbMaps_plot_dates.json')
+            json_file = os.path.join(self.config_values[f'{self.model}_cs_plot_ens'], f'{self.model}_ProbMaps_plot_dates.json')
             self.write_dates_json(date, json_file)
 
 

@@ -20,28 +20,11 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class MOGProcess:
-
-    def __init__(self, model):
-        self.config_values = {}
-
+    def __init__(self, config_values):
+        self.config_values = config_values
         # Navigate to the parent directory
         self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/COLDSURGE'
 
-        # Specify the path to the config file in the parent directory
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-
-        # Read the configuration file
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        # Get options in the 'model' section and store in the dictionary
-        for option, value in config.items(model):
-            self.config_values[option] = value
-
-        # We need analysis config details for concating data
-        self.config_values_analysis = {}
-        for option, value in config.items('analysis'):
-            self.config_values_analysis[option] = value
 
     def get_all_members(self, hr):
         if hr == 12:
@@ -55,10 +38,10 @@ class MOGProcess:
 
     def retrieve_fc_data_parallel(self, date, hr, fc, digit2_mem):
         print('In retrieve_fc_data_parallel()')
-        moosedir = os.path.join(self.config_values['moose_dir'], f'{date.strftime("%Y%m")}.pp')
+        moosedir = os.path.join(self.config_values['mogreps_moose_dir'], f'{date.strftime("%Y%m")}.pp')
         digit3_mem = '035' if (hr == 18 and digit2_mem == '00') else str('%03d' % int(digit2_mem))
 
-        remote_data_dir = os.path.join(self.config_values['forecast_data_dir'],
+        remote_data_dir = os.path.join(self.config_values['mogreps_raw_dir'],
                                        date.strftime("%Y%m%d"), digit3_mem)
         if not os.path.exists(remote_data_dir):
             os.makedirs(remote_data_dir)
@@ -72,7 +55,7 @@ class MOGProcess:
         outfile = f'englaa_pd{fct}.pp'
 
         # Generate a unique query file
-        local_query_file1 = os.path.join(self.config_values['dummy_queryfiles_dir'],
+        local_query_file1 = os.path.join(self.config_values['mogreps_dummy_queryfiles_dir'],
                                          f'localquery_{uuid.uuid1()}')
         self.create_query_file(local_query_file1, filemoose, fct)
 
@@ -81,7 +64,7 @@ class MOGProcess:
 
         if not outfile_status:
             print('EXECCCC')
-            command = f'/opt/moose-client-wrapper/bin/moo select {local_query_file1} {moosedir} {os.path.join(remote_data_dir, outfile)}'
+            command = f'/opt/moose-client-wrapper/bin/moo select --fill-gaps {local_query_file1} {moosedir} {os.path.join(remote_data_dir, outfile)}'
             logger.info('Executing command: %s', command)
 
             try:
@@ -98,7 +81,7 @@ class MOGProcess:
 
     def check_if_all_data_exist(self, date, hr, fc, digit2_mem):
         digit3_mem = str('%03d' % int(digit2_mem))
-        remote_data_dir = os.path.join(self.config_values['forecast_data_dir'],
+        remote_data_dir = os.path.join(self.config_values['mogreps_raw_dir'],
                                        date.strftime("%Y%m%d"), digit3_mem)
         fct = f'{fc:03d}'
         outfile = f'englaa_pd{fct}.pp'
@@ -107,7 +90,7 @@ class MOGProcess:
         return outfile_status
 
     def create_query_file(self, local_query_file1, filemoose, fct):
-        query_file = self.config_values['queryfile']
+        query_file = self.config_values['mogreps_combined_queryfile']
 
         replacements = {'fctime': fct, 'filemoose': filemoose}
         with open(query_file) as query_infile, open(local_query_file1, 'w') as query_outfile:
@@ -116,7 +99,7 @@ class MOGProcess:
                     line = line.replace(src, target)
                 query_outfile.write(line)
 
-    def retrieve_mogreps_data(self, date):
+    def retrieve_mogreps_data(self, date, parallel=True):
         print('Retrieving data for date:', date)
 
         hr_list = [12, 18]
@@ -130,23 +113,26 @@ class MOGProcess:
         #for task in tasks:
         #    self.retrieve_fc_data_parallel(*task)
 
-        # Use ThreadPoolExecutor to run tasks in parallel
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            # Submit tasks to the executor
-            futures = [executor.submit(self.retrieve_fc_data_parallel, *task) for task in tasks]
+        if parallel:
+            # Use ThreadPoolExecutor to run tasks in parallel
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # Submit tasks to the executor
+                futures = [executor.submit(self.retrieve_fc_data_parallel, *task) for task in tasks]
+
+                # Wait for all tasks to complete
+                concurrent.futures.wait(futures)
 
             # Wait for all tasks to complete
-            concurrent.futures.wait(futures)
+            #print(concurrent.futures.as_completed(futures))
 
-        # Wait for all tasks to complete
-        #print(concurrent.futures.as_completed(futures))
+            #file_present = all([self.check_if_all_data_exist(*task) for task in tasks ])
+            # Check if all tasks are completed
+            all_tasks_completed = all(future.done() for future in futures)
 
-        #file_present = all([self.check_if_all_data_exist(*task) for task in tasks ])
-        # Check if all tasks are completed
-        all_tasks_completed = all(future.done() for future in futures)
-
-        return all_tasks_completed
-
+            return all_tasks_completed
+        else:
+            for task in tasks:
+                self.retrieve_fc_data_parallel(*task)
 
 
         # Check if all tasks are completed successfully
@@ -180,12 +166,41 @@ class MOGProcess:
         reg_cube = my_cubes.regrid(base_cube, iris.analysis.Linear())
         return reg_cube
     def read_precip_correctly(self, data_files, varname, lbproc=0):
-        data_files.sort()
-        cube = iris.load_cube(data_files, 'precipitation_amount')
+        cubes = []
+        for data_file in data_files:
+            # Some files have 3 hourly wind data which need to be averaged
+            cube = iris.load_cube(data_file, varname)
+            if len(cube.shape) == 3:
+                cube = cube.collapsed('time', iris.analysis.MEAN)
+            if cube.coord('forecast_period').bounds is None:
+                bounds = [[cube.coord('forecast_period').points[0] - 1., cube.coord('forecast_period').points[0] + 1.]]
+                cube.coord('forecast_period').bounds = bounds
+            if cube.coord('time').bounds is None:
+                bounds = [[cube.coord('time').points[0] - 1., cube.coord('time').points[0] + 1.]]
+                cube.coord('time').bounds = bounds
 
-        # do differences to get daily values
-        cubes = cube[1:] - cube.data[:-1]
-        return self.regrid2obs(cubes)
+            # Massaging the data for mergine
+            for coord in ['forecast_reference_time', 'realization', 'time']:
+                cube.remove_coord(coord) if cube.coords(coord) else None
+            #cube.coord('forecast_period').points = cube.coord('forecast_period').bounds[:, 1]
+
+            cubes.append(cube)
+
+        # Correcting metadata for merging
+        for i, cube in enumerate(cubes):
+            # print(f"Cube {i} metadata:\n{cube.metadata}\n")
+            cube.cell_methods = cubes[0].cell_methods
+            if cube.coords("forecast_period"):
+                new_fp = iris.coords.DimCoord(
+                    cube.coord("forecast_period").points,
+                    standard_name="forecast_period",
+                    units=cube.coord("forecast_period").units
+                )
+                cube.replace_coord(new_fp)
+
+        # Merge
+        cubes = iris.cube.CubeList(cubes).merge_cube()
+        return self.subset_seasia(cubes)
 
     def read_olr_correctly(self, data_files, varname, lbproc=0):
         if varname == 'olr':
@@ -249,7 +264,7 @@ class MOGProcess:
 
         for varname in ['precip', 'u850', 'v850']:
             concated_dir = os.path.join(
-                self.config_values['forecast_out_dir'], varname )
+                self.config_values['mogreps_cs_processed_dir'], varname )
 
             if not os.path.exists(concated_dir):
                 os.makedirs(concated_dir)
@@ -268,18 +283,15 @@ class MOGProcess:
                     # progress bar
                     self.print_progress_bar(int(mem), len(members))
 
-                    mog_files = [os.path.join(self.config_values['forecast_data_dir'],
+                    mog_files = [os.path.join(self.config_values['mogreps_raw_dir'],
                                               date.strftime("%Y%m%d"), mem, f'englaa_pd{fct}.pp')
                                  for fct in fc_times]
                     mog_files.sort()
                     realiz_coord = iris.coords.DimCoord([int(mem)], standard_name='realization',
                                                         var_name='realization')
-
-
-
                     if varname == 'precip':
-                        cube = iris.load_cube(mog_files, 'precipitation_amount')
-                        cube = self.subset_seasia(cube)
+                        #cube = iris.load_cube(mog_files, )
+                        cube = self.read_precip_correctly(mog_files, 'precipitation_amount')
                         cube.data[1:] -= cube.data[:-1]
                     elif varname == 'u850':
                         cube = self.read_winds_correctly(mog_files, 'x_wind', pressure_level=850)
@@ -291,13 +303,14 @@ class MOGProcess:
                     for coord in ['forecast_reference_time', 'realization', 'time']:
                         cube.remove_coord(coord) if cube.coords(coord) else None
                     cube.add_aux_coord(realiz_coord)
-                    cube.coord('forecast_period').points = cube.coord('forecast_period').bounds[:, 1]
+                    #cube.coord('forecast_period').points = cube.coord('forecast_period').bounds[:, 1]
                     cubes.append(cube)
 
 
                 cube = iris.cube.CubeList(cubes).merge_cube()
-                cube.add_dim_coord(time_coord, 1)
                 print(cube)
+                #cube.add_dim_coord(time_coord, 1)
+                #print(cube)
                 iris.save(cube, combined_allmember_file, netcdf_format='NETCDF4_CLASSIC')
                 print(f'Written {combined_allmember_file}')
             else:

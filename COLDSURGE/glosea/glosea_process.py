@@ -19,33 +19,11 @@ logger = logging.getLogger(__name__)
 
 class GLOProcess:
 
-    def __init__(self, model):
-        self.config_values = {}
+    def __init__(self, config_values):
+        self.config_values = config_values
         self.nforecasts = 15
-        #self.base_cube = self.load_base_cube()
-
         # Navigate to the parent directory
-        #parent_dir = os.getcwd()
-        self.parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/COLDSURGE'
-
-        # Specify the path to the config file in the parent directory
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-        print(config_path)
-
-        # Read the configuration file
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        # Get options in the 'model' section and store in the dictionary
-        for option, value in config.items(model):
-            self.config_values[option] = value
-        print(self.config_values)
-
-        # We need analysis config details for concating data
-        self.config_values_analysis = {}
-        for option, value in config.items('analysis'):
-            self.config_values_analysis[option] = value
-        print(self.config_values_analysis)
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/COLDSURGE'
 
     def command_helper(self, command):
         print(command)
@@ -76,7 +54,7 @@ class GLOProcess:
         :rtype:
         '''
         # read data catalogue
-        df = pd.read_csv('~sfcpp/bin/MassGet_py3/archived_data/%s.csv' % prod)
+        df = pd.read_csv('~sfcpp/bin/MassGet/archived_data/%s.csv' % prod)
         # select moose info for the date
         df = df.loc[(df.iyr == date.year) & (df.imon == date.month) & (df.iday == date.day)]
         if not df.empty:
@@ -86,14 +64,14 @@ class GLOProcess:
             df.loc[(df['prod'] == ('prodf')), 'suite'] = 'forecast'
             df.loc[(df['prod'] == ('prodm')), 'suite'] = 'monthly'
 
-            sample_query_file = self.config_values['queryfile']
+            sample_query_file = self.config_values['glosea_combined_queryfile']
             # read query sample files
             # the file to dump the new query based on sample above
 
             # Generate a unique query file
-            local_query_file = os.path.join(self.config_values['dummy_queryfiles_dir'],
+            local_query_file = os.path.join(self.config_values['glosea_dummy_queryfiles_dir'],
                                              f'localquery_{uuid.uuid1()}')
-            fcast_in_dir = self.config_values['forecast_data_dir']
+            fcast_in_dir = self.config_values['glosea_raw_dir']
             # Replace the key words with real filter info in query file
             replacements = {'MODE': df.iloc[0].sys, 'PSNUM': df.iloc[0].psnum, 'SUITE': df.iloc[0].suite,
                             'SYSTEM': df.iloc[0].config, 'START_DATE': date.strftime("%d/%m/%Y"),
@@ -141,7 +119,7 @@ class GLOProcess:
 
         for varname in varnames:
             concated_dir = os.path.join(
-                self.config_values['forecast_out_dir'], varname)
+                self.config_values['glosea_cs_processed_dir'], varname)
             combined_allmember_file = os.path.join(concated_dir,
                                                    f'{varname}_ColdSurge_24h_allMember_{date.strftime("%Y%m%d")}.nc')
 
@@ -176,12 +154,12 @@ class GLOProcess:
         suite_dic = {'prodm': 'monthly', 'prodf': 'forecast'}
         date_label = date.strftime("%Y%m%d")
 
-        gs_out_dir = os.path.join(self.config_values['forecast_out_dir'], date_label)
+        gs_out_dir = os.path.join(self.config_values['glosea_cs_processed_dir'], date_label)
         if not os.path.exists(gs_out_dir):
             os.makedirs(gs_out_dir)
 
         # get all members
-        command = '%s/%s_*_%s_*.pp' % (os.path.join(self.config_values['forecast_data_dir'],
+        command = '%s/%s_*_%s_*.pp' % (os.path.join(self.config_values['glosea_raw_dir'],
                                                     suite_dic[prod], date_label), prod, date_label)
         files = glob.glob(command)
         members = list(set([file.split('_')[-1].split('.')[0] for file in files]))
@@ -199,7 +177,7 @@ class GLOProcess:
 
         for varname in varnames:
             concated_dir = os.path.join(
-                self.config_values['forecast_out_dir'], varname)
+                self.config_values['glosea_cs_processed_dir'], varname)
 
             if not os.path.exists(concated_dir):
                 os.makedirs(concated_dir)
@@ -216,11 +194,10 @@ class GLOProcess:
 
                 if not os.path.exists(fcast_file):
                     command = '%s/%s_*_%s_*_%s.pp' % (
-                        os.path.join(self.config_values['forecast_data_dir'],
+                        os.path.join(self.config_values['glosea_raw_dir'],
                                      suite_dic[prod], date_label), prod, date_label, mem)
                     member_files = glob.glob(command)
                     member_files.sort()
-
                     if varname == 'precip':
                         print('reading PRECIP...')
                         fcast_cube = iris.load_cube(member_files, 'precipitation_flux')
