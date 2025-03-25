@@ -24,10 +24,10 @@ mogreps:
   eqwaves:
     mogreps_eqwaves_processed_dir: /data/scratch/prince.xavier/SALMON/processed_SEA_data/mogreps/eqwaves/
     mogreps_eqwaves_plot_ens: /data/users/prince.xavier/SALMON/processed_SEA_data/mogreps/plot_ens/
-  bsiso:
-    mogreps_bsiso_processed_dir: /data/scratch/prince.xavier/SEA_monitoring/processed_SEA_data/mogreps/MJO
-    mogreps_bsiso_archive_dir: /project/MJO_GCSS/SEA_monitoring/processed_BSISO_data/mogreps/bsiso_new/
-    mogreps_bsiso_plot_ens: /project/MJO_GCSS/SEA_monitoring/processed_BSISO_data/mogreps/plot_ens_new
+  #bsiso:
+  #  mogreps_bsiso_processed_dir: /data/scratch/prince.xavier/SEA_monitoring/processed_SEA_data/mogreps/MJO
+  #  mogreps_bsiso_archive_dir: /project/MJO_GCSS/SEA_monitoring/processed_BSISO_data/mogreps/bsiso_new/
+  #  mogreps_bsiso_plot_ens: /project/MJO_GCSS/SEA_monitoring/processed_BSISO_data/mogreps/plot_ens_new
 
 glosea:
   glosea_dummy_queryfiles_dir: /data/scratch/prince.xavier/SALMON/temp
@@ -40,7 +40,7 @@ glosea:
   cs:
     glosea_cs_processed_dir: /data/scratch/prince.xavier/SALMON/processed_SEA_data/glosea/coldsurge
     glosea_cs_plot_ens: /data/users/prince.xavier/SALMON/processed_SEA_data/glosea/plot_ens_new
-  bsiso:
-    glosea_bsiso_processed_dir: /data/scratch/prince.xavier/SEA_monitoring/processed_SEA_data/glosea/MJO
-    glosea_bsiso_archive_dir: /project/MJO_GCSS/SEA_monitoring/processed_BSISO_data/glosea/bsiso_new/
-    glosea_bsiso_plot_ens: /project/MJO_GCSS/SEA_monitoring/processed_BSISO_data/glosea/plot_ens_new
+  #bsiso:
+  #  glosea_bsiso_processed_dir: /data/scratch/prince.xavier/SEA_monitoring/processed_SEA_data/glosea/MJO
+  #  glosea_bsiso_archive_dir: /project/MJO_GCSS/SEA_monitoring/processed_BSISO_data/glosea/bsiso_new/
+  #  glosea_bsiso_plot_ens: /project/MJO_GCSS/SEA_monitoring/processed_BSISO_data/glosea/plot_ens_new

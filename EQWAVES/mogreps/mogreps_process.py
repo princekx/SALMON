@@ -19,17 +19,19 @@ logger = logging.getLogger(__name__)
 
 class MOGProcess:
 
-    def __init__(self, model):
+    def __init__(self, config_values_analysis, config_values):
         """
         Initializes the MOGProcess class with configuration values.
 
         Args:
-            model (str): The model section in the configuration file.
+        model (str): The model section in the configuration file.
         """
-        self.parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/EQWAVES'
-        self.config_values = {}
-        self.config_values_analysis = {}
-        self.load_config_values(model)
+        self.config_values_analysis = config_values_analysis
+        self.config_values = config_values
+
+        # Navigate to the parent directory
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/EQWAVES'
+
         self.ntimes_total = 360
         self.ntimes_analysis = 332
         self.ntimes_forecast = 28
@@ -61,19 +63,6 @@ class MOGProcess:
 
         self.R = 6378388.  # Radius of the earth
         self.deg2rad = 0.0174533  # pi/180.
-    def load_config_values(self, model):
-        """
-        Loads configuration values from the config.ini file.
-
-        Args:
-            model (str): The model section in the configuration file.
-        """
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        self.config_values = dict(config.items(model))
-        self.config_values_analysis = dict(config.items('analysis'))
 
     def print_progress_bar(self, iteration, total):
         percentage = 100 * iteration / total
@@ -140,6 +129,8 @@ class MOGProcess:
         return cube
 
     def concat_analysis_forecast(self, date, analysis_cube, forecast_cube):
+
+        print(analysis_cube.shape, forecast_cube.shape)
         concatenated_array = np.concatenate((analysis_cube.data, forecast_cube.data), axis=0)
 
 
@@ -164,6 +155,8 @@ class MOGProcess:
         for coord in analysis_cube.dim_coords[1:]:
             dim_coords_and_dims.append((coord, analysis_cube.coord_dims(coord)[0]))
 
+        print(concatenated_array.shape)
+
         concat_cube = iris.cube.Cube(
             concatenated_array,
             long_name=forecast_cube.long_name,
@@ -180,10 +173,10 @@ class MOGProcess:
 
         date_label = date.strftime('%Y%m%d_%H')
         # read forecast data
-        remote_data_dir = os.path.join(self.config_values['mog_forecast_raw_dir'],
+        remote_data_dir = os.path.join(self.config_values['mogreps_raw_dir'],
                                        date.strftime("%Y%m%d"), str_hr, mem_label)
 
-        outfile_dir = os.path.join(self.config_values['mog_forecast_processed_dir'], date_label)
+        outfile_dir = os.path.join(self.config_values['mogreps_eqwaves_processed_dir'], date_label)
 
         if not os.path.exists(outfile_dir):
             try:
@@ -205,25 +198,31 @@ class MOGProcess:
             outfile_name = os.path.join(outfile_dir, f'{var}_combined_{date_label}Z_{mem_label}.nc')
             if not os.path.exists(outfile_name):
                 # Read the analysis data here
-                analysis_combined_file = os.path.join(self.config_values_analysis['analysis_processed_dir'],
+                analysis_combined_file = os.path.join(self.config_values_analysis['analysis_eqwaves_processed_dir'],
                                             f'{var}_analysis_{date_label}.nc')
                 analysis_cube = iris.load_cube(analysis_combined_file)
 
+                print(var)
+                print(analysis_combined_file)
+                print(forecast_files)
                 # Read forecast data
                 if var == 'precipitation_flux':
-                    forecast_cube = iris.load_cube(forecast_files, 'precipitation_amount')
+                    forecast_cube = self.read_forecasts(date, forecast_files, 'precipitation_amount')
+
                     # 6 hourly values from accumulations.
                     forecast_cube.data[1:] -= forecast_cube.data[:-1]
 
                     # convert units
                     analysis_cube.data *= 3600.
                 else:
-                    forecast_cube = iris.load_cube(forecast_files, var)
+                    forecast_cube = self.read_forecasts(date, forecast_files, var)
+
 
                 # regrid to the reference grid
                 forecast_cube = forecast_cube.regrid(self.ref_grid, iris.analysis.Linear())
                 # Combining analysis and forecasts
-                print(forecast_cube, analysis_cube)
+
+                #, analysis_cube)
                 combined_cube = self.concat_analysis_forecast(date, analysis_cube, forecast_cube)
 
                 # Check if 'realization' coordinate exists
@@ -241,6 +240,41 @@ class MOGProcess:
             else:
                 print(f'{outfile_name} exists. Skip')
 
+    def make_mergable(self, cubes, date):
+        for i, cube in enumerate(cubes):
+            cube.cell_methods = ()
+            if cube.coords("forecast_period"):  # If missing
+                cube.remove_coord("forecast_period")
+            forecast_period_coord = iris.coords.AuxCoord(
+                np.array([(i + 1) * 6]), standard_name="forecast_period",
+                units=f"hours since {date.strftime('%Y-%m-%d %H:00:00')}")
+            cube.add_aux_coord(forecast_period_coord)
+
+            if cube.coords("time"):  # If missing
+                cube.remove_coord("time")
+
+            forecast_time_coord = iris.coords.AuxCoord(
+                np.array([(i + 1) * 6]), standard_name="time",
+                units=f"hours since {date.strftime('%Y-%m-%d %H:00:00')}")
+            cube.add_aux_coord(forecast_time_coord)
+
+            if cube.coords("time"):
+                print(f"Cube {i} forecast_period: {cube.coord('time').units}")
+            else:
+                print(f"Cube {i} has no time coordinate")
+        return iris.cube.CubeList(cubes).merge_cube()
+
+    def read_forecasts(self, date, forecast_files, var):
+        forecast_cubes = []
+        for forecast_file in forecast_files:
+            forecast_cube = iris.load_cube(forecast_file, var)
+
+            if len(forecast_cube.shape) == 4:
+                forecast_cube = forecast_cube.collapsed('time', iris.analysis.MEAN)
+            forecast_cubes.append(forecast_cube)
+
+        return self.make_mergable(forecast_cubes, date)
+
     def create_query_file(self, local_query_file1, filemoose, fct):
         """
         Creates a query file based on template and replacements.
@@ -251,7 +285,7 @@ class MOGProcess:
             fct (str): Forecast time.
 
         """
-        query_file = self.config_values['mog_query_file']
+        query_file = self.config_values['mogreps_combined_queryfile']
 
         replacements = {'fctime': fct, 'filemoose': filemoose}
         with open(query_file) as query_infile, open(local_query_file1, 'w') as query_outfile:
@@ -278,13 +312,13 @@ class MOGProcess:
 
         date_label = f"{str_year}{str_month}{str_day}_{str_hr}"
         logger.info(f'Doing date: {date_label}, Member: {mem_label}, Forecast: {fc}')
-        print(f'Doing date: {date_label}, Member: {mem_label}, Forecast: {fc}')  # Add this line
+        print(f'Retrieving date: {date_label}, Member: {mem_label}, Forecast: {fc}')  # Add this line
 
-        moose_dir = os.path.join(self.config_values['mog_moose_dir'], f"{date.strftime('%Y%m')}.pp")
+        moose_dir = os.path.join(self.config_values['mogreps_moose_dir'], f"{date.strftime('%Y%m')}.pp")
         fcx = 3 if fc == 0 else fc
         fct = f"{fcx:03d}"
 
-        remote_data_dir = os.path.join(self.config_values['mog_forecast_raw_dir'],
+        remote_data_dir = os.path.join(self.config_values['mogreps_raw_dir'],
                                        date.strftime("%Y%m%d"), str_hr, mem_label)
 
         if not os.path.exists(remote_data_dir):
@@ -292,24 +326,39 @@ class MOGProcess:
 
         outfile = f'qg{str_hr}T{fct}.pp'
         outfile_path = os.path.join(remote_data_dir, outfile)
-        if os.path.exists(outfile_path) and os.path.getsize(outfile_path) > 0:
+        if os.path.exists(outfile_path):
             logger.info(f'{outfile_path} exists. Skipping retrieval.')
             print(f'{outfile_path} exists. Skipping retrieval.')
-        else:
-            file_moose = f'prods_op_mogreps-g_{date.strftime("%Y%m%d")}_{str_hr}_{mem}_{fct}.pp'
-            local_query_file1 = os.path.join(self.config_values['mog_dummy_queryfiles_dir'],
-                                             f'eqw_localquery_{uuid.uuid1()}')
-            self.create_query_file(local_query_file1, file_moose, fct)
 
-            command = f'/opt/moose-client-wrapper/bin/moo select {local_query_file1} {moose_dir} {outfile_path}'
-            logger.info(command)
-            subprocess.run(command, shell=True, check=True)
+            if os.path.getsize(outfile_path) == 0:
+                # delete the file
+                print(os.path.getsize(outfile_path))
+                print(f'Deleting empty file {outfile_path}')
+                os.remove(outfile_path)
+
+                # now retrieve again
+                self.run_retrieval(date, str_hr, mem, fct, moose_dir, outfile_path)
+            else:
+                pass
+        else:
+            self.run_retrieval(date, str_hr, mem, fct, moose_dir, outfile_path)
 
         #except subprocess.CalledProcessError as e:
         #    logger.error(f'{file_moose} not returned. Check file on moose. Error: {e}')
         #    sys.exit()
 
-    def retrieve_mogreps_forecast_data(self, date):
+    def run_retrieval(self, date, str_hr, mem, fct, moose_dir, outfile_path):
+        # the retrieval call.
+        # now retrieve again
+        file_moose = f'prods_op_mogreps-g_{date.strftime("%Y%m%d")}_{str_hr}_{mem}_{fct}.pp'
+        local_query_file1 = os.path.join(self.config_values['mogreps_dummy_queryfiles_dir'],
+                                         f'eqw_localquery_{uuid.uuid1()}')
+        self.create_query_file(local_query_file1, file_moose, fct)
+        command = f'/opt/moose-client-wrapper/bin/moo select --fill-gaps {local_query_file1} {moose_dir} {outfile_path}'
+        logger.info(command)
+        subprocess.run(command, shell=True, check=True)
+
+    def retrieve_mogreps_forecast_data(self, date, parallel=True):
         """
         Retrieves MOGREPS forecast data for a given date.
 
@@ -324,19 +373,23 @@ class MOGProcess:
 
         tasks = [(date, member, mem_labels[m], fc_time) for fc_time in self.fc_times
                  for m, member in enumerate(members)]
+        if parallel:
+            # # Use ThreadPoolExecutor to run tasks in parallel
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                # Submit tasks to the executor
+                futures = [executor.submit(self.retrieve_data_member, *task) for task in tasks]
 
-        # # Use ThreadPoolExecutor to run tasks in parallel
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            # Submit tasks to the executor
-            futures = [executor.submit(self.retrieve_data_member, *task) for task in tasks]
+                # Wait for all tasks to complete
+                concurrent.futures.wait(futures)
+
 
             # Wait for all tasks to complete
-            concurrent.futures.wait(futures)
-
-
-        # Wait for all tasks to complete
-        all_tasks_completed = all(future.done() for future in futures)
-        return all_tasks_completed
+            all_tasks_completed = all(future.done() for future in futures)
+            return all_tasks_completed
+        else:
+            print(f'Working in serial mode')
+            for task in tasks:
+                self.retrieve_data_member(*task)
 
     def makes_5d_cube(self, data, wave_names, time_coord, pressure_coord,
                       lat_coord, lon_coord):

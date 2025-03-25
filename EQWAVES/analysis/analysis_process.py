@@ -140,10 +140,11 @@ class AnalysisProcess:
         analysis_data_files = [os.path.join(self.config_values['analysis_raw_dir'],
                                        an_date.strftime("%Y%m%d"), f"qg{an_date.strftime('%H')}T000.pp")
                                for an_date in analysis_dates]
-        print(analysis_data_files)
+        print(f'Reading {len(analysis_data_files)} analysis files')
 
-        for var in ['x_wind', 'y_wind', 'geopotential_height', 'precipitation_flux']:
-            outfile_name = os.path.join(self.config_values['analysis_processed_dir'],
+        #for var in ['x_wind', 'y_wind', 'geopotential_height', 'precipitation_flux']:
+        for var in ['x_wind', 'y_wind', 'geopotential_height']:
+            outfile_name = os.path.join(self.config_values['analysis_eqwaves_processed_dir'],
                                         f'{var}_analysis_{date_label}.nc')
             if not os.path.exists(outfile_name):
                 print(f'Generating {outfile_name}')

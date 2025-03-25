@@ -6,7 +6,7 @@ begin
   pp_file="filemoose"
 end
 begin
-  stash=5216
+  stash=(5226, 5216)
   lbft=fctime
   lbproc=0
   pp_file="filemoose"
