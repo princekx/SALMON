@@ -17,6 +17,7 @@ from . import calculus
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class MOGProcess:
 
     def __init__(self, config_values_analysis, config_values):
@@ -78,6 +79,7 @@ class MOGProcess:
         members = members_tuple[str_hr]
         mem_labels = [f'{fc:03}' for fc in range(0, 18)]
         return members, mem_labels
+
     def create_cube(self, latitudes=(-90.5, 90.5), longitudes=(-0.5, 359.5), spacing=1):
         """
         Create empty cube with regular lat-long grid.
@@ -132,7 +134,6 @@ class MOGProcess:
 
         print(analysis_cube.shape, forecast_cube.shape)
         concatenated_array = np.concatenate((analysis_cube.data, forecast_cube.data), axis=0)
-
 
         analysis_datetime_list = sorted([date + datetime.timedelta(hours=(i + 1) * 6)
                                          for i in range(-self.ntimes_analysis, 0)])
@@ -190,16 +191,15 @@ class MOGProcess:
         realiz_coord = iris.coords.DimCoord([int(mem_label)], standard_name='realization',
                                             var_name='realization')
 
-
         forecast_files = [os.path.join(remote_data_dir, f'qg{str_hr}T{fct:03d}.pp') for fct in self.fc_times]
         forecast_files = [file for file in forecast_files if os.path.exists(file)]
-        #print(forecast_files)
+        # print(forecast_files)
         for var in ['x_wind', 'y_wind', 'geopotential_height', 'precipitation_flux']:
             outfile_name = os.path.join(outfile_dir, f'{var}_combined_{date_label}Z_{mem_label}.nc')
             if not os.path.exists(outfile_name):
                 # Read the analysis data here
                 analysis_combined_file = os.path.join(self.config_values_analysis['analysis_eqwaves_processed_dir'],
-                                            f'{var}_analysis_{date_label}.nc')
+                                                      f'{var}_analysis_{date_label}.nc')
                 analysis_cube = iris.load_cube(analysis_combined_file)
 
                 print(var)
@@ -213,22 +213,26 @@ class MOGProcess:
                     forecast_cube.data[1:] -= forecast_cube.data[:-1]
 
                     # convert units
-                    analysis_cube.data *= 3600.
+                    # analysis_cube.data *= 3600.
+
+                    # regrid to the reference grid
+                    forecast_cube = forecast_cube.regrid(self.ref_grid, iris.analysis.Linear())
+
+                    # we are not using analysis data for precip
+                    combined_cube = forecast_cube
+
                 else:
                     forecast_cube = self.read_forecasts(date, forecast_files, var)
 
+                    # regrid to the reference grid
+                    forecast_cube = forecast_cube.regrid(self.ref_grid, iris.analysis.Linear())
 
-                # regrid to the reference grid
-                forecast_cube = forecast_cube.regrid(self.ref_grid, iris.analysis.Linear())
-                # Combining analysis and forecasts
-
-                #, analysis_cube)
-                combined_cube = self.concat_analysis_forecast(date, analysis_cube, forecast_cube)
+                    # Combining analysis and forecasts
+                    combined_cube = self.concat_analysis_forecast(date, analysis_cube, forecast_cube)
 
                 # Check if 'realization' coordinate exists
                 if combined_cube.coords('realization'):
                     combined_cube.remove_coord('realization')
-
 
                 # Add 'realization' coordinate as an auxiliary coordinate
                 combined_cube.add_aux_coord(realiz_coord)
@@ -246,7 +250,7 @@ class MOGProcess:
             if cube.coords("forecast_period"):  # If missing
                 cube.remove_coord("forecast_period")
             forecast_period_coord = iris.coords.AuxCoord(
-                np.array([(i + 1) * 6]), standard_name="forecast_period",
+                self.fc_times[i], standard_name="forecast_period",
                 units=f"hours since {date.strftime('%Y-%m-%d %H:00:00')}")
             cube.add_aux_coord(forecast_period_coord)
 
@@ -254,7 +258,7 @@ class MOGProcess:
                 cube.remove_coord("time")
 
             forecast_time_coord = iris.coords.AuxCoord(
-                np.array([(i + 1) * 6]), standard_name="time",
+                self.fc_times[i], standard_name="time",
                 units=f"hours since {date.strftime('%Y-%m-%d %H:00:00')}")
             cube.add_aux_coord(forecast_time_coord)
 
@@ -343,7 +347,7 @@ class MOGProcess:
         else:
             self.run_retrieval(date, str_hr, mem, fct, moose_dir, outfile_path)
 
-        #except subprocess.CalledProcessError as e:
+        # except subprocess.CalledProcessError as e:
         #    logger.error(f'{file_moose} not returned. Check file on moose. Error: {e}')
         #    sys.exit()
 
@@ -382,7 +386,6 @@ class MOGProcess:
                 # Wait for all tasks to complete
                 concurrent.futures.wait(futures)
 
-
             # Wait for all tasks to complete
             all_tasks_completed = all(future.done() for future in futures)
             return all_tasks_completed
@@ -412,6 +415,7 @@ class MOGProcess:
         var_cube.add_dim_coord(lon_coord, 4)
 
         return var_cube
+
     def uz_to_qr(self, u, z):
         # transform u,z to q, r using q=z*(g/c) + u; r=z*(g/c) - u
         q = z * self.g_on_c + u
@@ -540,7 +544,7 @@ class MOGProcess:
 
         return uf_wave, zf_wave, vf_wave
 
-    def write_wave_data(self, date, wave_cube,  mem_label, var_name='u_wave'):
+    def write_wave_data(self, date, wave_cube, mem_label, var_name='u_wave'):
 
         str_hr = date.strftime('%H')
         date_label = date.strftime('%Y%m%d_%H')
@@ -649,8 +653,8 @@ class MOGProcess:
 
         # Project onto individual wave modes
         uf_wave, zf_wave, vf_wave = self.filt_project(qf, rf, vf, lats.points,
-                                                 self.y0, self.wave_names, self.pmin, self.pmax,
-                                                 self.kmin, self.kmax, self.c_on_g)
+                                                      self.y0, self.wave_names, self.pmin, self.pmax,
+                                                      self.kmin, self.kmax, self.c_on_g)
         # Inverse Fourier transform in time and longitude
         u_wave = np.real(np.fft.ifft2(uf_wave, axes=(1, -1)))
         z_wave = np.real(np.fft.ifft2(zf_wave, axes=(1, -1)))
@@ -749,19 +753,19 @@ class MOGProcess:
             progress = (completed_tasks / total_tasks) * 100
             print(f'\rProgress: {progress:.2f}%', end='', flush=True)
 
-        #print()  # Print newline after progress
+        # print()  # Print newline after progress
 
         # Create a new pool of processes for computing wave-related variables
-        #pool = multiprocessing.Pool()
+        # pool = multiprocessing.Pool()
         # Execute the compute_waves_driver_member function in parallel for each member
-        #pool.starmap(self.compute_waves_driver_member, [(date, mem_label) for mem_label in mem_labels])
+        # pool.starmap(self.compute_waves_driver_member, [(date, mem_label) for mem_label in mem_labels])
         # Close the pool to free up resources
-        #pool.close()
+        # pool.close()
         # Wait for all processes to finish
-        #pool.join()
+        # pool.join()
 
         # Check if all tasks are completed
-        #if pool._state == multiprocessing.pool.CLOSE:
+        # if pool._state == multiprocessing.pool.CLOSE:
         #    return "All tasks completed"
-        #else:
+        # else:
         #    return "Tasks are still running"
