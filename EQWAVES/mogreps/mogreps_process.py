@@ -604,6 +604,17 @@ class MOGProcess:
             dcube /= iris.util.broadcast_to_shape(dx, dcube.shape, (axis_index,))
         return dcube
 
+    def check_if_wave_computed(self, date, mem_label):
+        wnames = ['Kelvin', 'WMRG', 'R1', 'R2']
+        str_hr = date.strftime('%H')
+        date_label = date.strftime('%Y%m%d_%H')
+        outfile_dir = os.path.join(self.config_values['mogreps_eqwaves_processed_dir'], date_label)
+
+        var_files = [os.path.join(outfile_dir, f'{var_name}_{wname}_{date_label}Z_{mem_label}.nc')
+                     for var_name in ['vort_wave', 'div_wave'] for wname in wnames]
+
+        return all([os.path.exists(var_file) for var_file in var_files])
+
     def compute_waves_driver_member(self, date, mem_label):
         """
         Computes wave-related variables for a specific member of the MOGREPS forecast dataset.
@@ -627,76 +638,81 @@ class MOGProcess:
         None
         """
         print(f'Computing wave for member: {mem_label}')
-        str_hr = date.strftime('%H')
-        date_label = date.strftime('%Y%m%d_%H')
-        outfile_dir = os.path.join(self.config_values['mogreps_eqwaves_processed_dir'], date_label)
 
-        u_file = os.path.join(outfile_dir, f'x_wind_combined_{date_label}Z_{mem_label}.nc')
-        v_file = os.path.join(outfile_dir, f'y_wind_combined_{date_label}Z_{mem_label}.nc')
-        z_file = os.path.join(outfile_dir, f'geopotential_height_combined_{date_label}Z_{mem_label}.nc')
+        if not self.check_if_wave_computed(date, mem_label):
 
-        u = iris.load_cube(u_file)
-        v = iris.load_cube(v_file)
-        z = iris.load_cube(z_file)
+            str_hr = date.strftime('%H')
+            date_label = date.strftime('%Y%m%d_%H')
+            outfile_dir = os.path.join(self.config_values['mogreps_eqwaves_processed_dir'], date_label)
 
-        lons = u.coord('longitude')
-        lats = u.coord('latitude')
-        press = u.coord('pressure')
-        time_coord = u.coord('time')
+            u_file = os.path.join(outfile_dir, f'x_wind_combined_{date_label}Z_{mem_label}.nc')
+            v_file = os.path.join(outfile_dir, f'y_wind_combined_{date_label}Z_{mem_label}.nc')
+            z_file = os.path.join(outfile_dir, f'geopotential_height_combined_{date_label}Z_{mem_label}.nc')
 
-        # convert u,z to q,r
-        q, r = self.uz_to_qr(u.data, z.data)
+            u = iris.load_cube(u_file)
+            v = iris.load_cube(v_file)
+            z = iris.load_cube(z_file)
 
-        # Fourier transform in time and longitude
-        qf = np.fft.fft2(q.data, axes=(0, -1))
-        rf = np.fft.fft2(r.data, axes=(0, -1))
-        vf = np.fft.fft2(v.data, axes=(0, -1))
+            lons = u.coord('longitude')
+            lats = u.coord('latitude')
+            press = u.coord('pressure')
+            time_coord = u.coord('time')
 
-        del q, r, v  # Free up memory
-        gc.collect()
+            # convert u,z to q,r
+            q, r = self.uz_to_qr(u.data, z.data)
 
-        # Project onto individual wave modes
-        uf_wave, zf_wave, vf_wave = self.filt_project(qf, rf, vf, lats.points,
-                                                      self.y0, self.wave_names, self.pmin, self.pmax,
-                                                      self.kmin, self.kmax, self.c_on_g)
-        del qf, rf, vf  # Free up memory
-        gc.collect()
+            # Fourier transform in time and longitude
+            qf = np.fft.fft2(q.data, axes=(0, -1))
+            rf = np.fft.fft2(r.data, axes=(0, -1))
+            vf = np.fft.fft2(v.data, axes=(0, -1))
 
-        # Inverse Fourier transform in time and longitude
-        u_wave = np.real(np.fft.ifft2(uf_wave, axes=(1, -1)))
-        z_wave = np.real(np.fft.ifft2(zf_wave, axes=(1, -1)))
-        v_wave = np.real(np.fft.ifft2(vf_wave, axes=(1, -1)))
+            del q, r, v  # Free up memory
+            gc.collect()
 
-        del uf_wave, zf_wave, vf_wave  # Free memory
-        gc.collect()
+            # Project onto individual wave modes
+            uf_wave, zf_wave, vf_wave = self.filt_project(qf, rf, vf, lats.points,
+                                                          self.y0, self.wave_names, self.pmin, self.pmax,
+                                                          self.kmin, self.kmax, self.c_on_g)
+            del qf, rf, vf  # Free up memory
+            gc.collect()
 
-        # Make iris cubes before writing the data
-        u_wave_cube = self.makes_5d_cube(u_wave, self.wave_names, time_coord, press, lats, lons)
-        v_wave_cube = self.makes_5d_cube(v_wave, self.wave_names, time_coord, press, lats, lons)
-        z_wave_cube = self.makes_5d_cube(z_wave, self.wave_names, time_coord, press, lats, lons)
-        print(z_wave_cube)
-        del u_wave, v_wave, z_wave  # Free memory
-        gc.collect()
+            # Inverse Fourier transform in time and longitude
+            u_wave = np.real(np.fft.ifft2(uf_wave, axes=(1, -1)))
+            z_wave = np.real(np.fft.ifft2(zf_wave, axes=(1, -1)))
+            v_wave = np.real(np.fft.ifft2(vf_wave, axes=(1, -1)))
 
-        self.write_wave_data(date, u_wave_cube, mem_label, var_name='u_wave')
-        self.write_wave_data(date, v_wave_cube, mem_label, var_name='v_wave')
-        self.write_wave_data(date, z_wave_cube, mem_label, var_name='z_wave')
+            del uf_wave, zf_wave, vf_wave  # Free memory
+            gc.collect()
 
-        # Compute vorticty and divergence
-        # Divergence
-        div_wave = self.derivative(u_wave_cube, 'longitude').regrid(u_wave_cube, iris.analysis.Linear())
-        div_wave += self.derivative(v_wave_cube, 'latitude').regrid(u_wave_cube, iris.analysis.Linear())
-        self.write_wave_data(date, div_wave, mem_label, var_name='div_wave')
-        del div_wave  # Free memory
-        gc.collect()
+            # Make iris cubes before writing the data
+            u_wave_cube = self.makes_5d_cube(u_wave, self.wave_names, time_coord, press, lats, lons)
+            v_wave_cube = self.makes_5d_cube(v_wave, self.wave_names, time_coord, press, lats, lons)
+            z_wave_cube = self.makes_5d_cube(z_wave, self.wave_names, time_coord, press, lats, lons)
+            print(z_wave_cube)
+            del u_wave, v_wave, z_wave  # Free memory
+            gc.collect()
 
-        # Vorticity
-        vort_wave = self.derivative(v_wave_cube, 'longitude').regrid(u_wave_cube, iris.analysis.Linear())
-        vort_wave -= self.derivative(u_wave_cube, 'latitude').regrid(u_wave_cube, iris.analysis.Linear())
-        self.write_wave_data(date, vort_wave, mem_label, var_name='vort_wave')
+            self.write_wave_data(date, u_wave_cube, mem_label, var_name='u_wave')
+            self.write_wave_data(date, v_wave_cube, mem_label, var_name='v_wave')
+            self.write_wave_data(date, z_wave_cube, mem_label, var_name='z_wave')
 
-        del vort_wave, u_wave_cube, v_wave_cube, z_wave_cube  # Free memory
-        gc.collect()
+            # Compute vorticty and divergence
+            # Divergence
+            div_wave = self.derivative(u_wave_cube, 'longitude').regrid(u_wave_cube, iris.analysis.Linear())
+            div_wave += self.derivative(v_wave_cube, 'latitude').regrid(u_wave_cube, iris.analysis.Linear())
+            self.write_wave_data(date, div_wave, mem_label, var_name='div_wave')
+            del div_wave  # Free memory
+            gc.collect()
+
+            # Vorticity
+            vort_wave = self.derivative(v_wave_cube, 'longitude').regrid(u_wave_cube, iris.analysis.Linear())
+            vort_wave -= self.derivative(u_wave_cube, 'latitude').regrid(u_wave_cube, iris.analysis.Linear())
+            self.write_wave_data(date, vort_wave, mem_label, var_name='vort_wave')
+
+            del vort_wave, u_wave_cube, v_wave_cube, z_wave_cube  # Free memory
+            gc.collect()
+        else:
+            print(f'All wave files are found. skipping computation.')
 
     def process_mogreps_forecast_data(self, date):
         """

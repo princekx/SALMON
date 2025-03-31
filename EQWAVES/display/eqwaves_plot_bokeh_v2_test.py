@@ -20,7 +20,15 @@ from bokeh.models import Legend, LegendItem
 from skimage import measure
 
 class EqWavesDisplay:
-    def __init__(self, model):
+    def __init__(self, model, config_values_analysis, config_values):
+        """
+        Initializes the MOGProcess class with configuration values.
+
+        Args:
+        model (str): The model section in the configuration file.
+        """
+        self.config_values_analysis = config_values_analysis
+        self.config_values = config_values
         """
         Initializes the EqWavesDisplay class with configuration values.
 
@@ -28,10 +36,7 @@ class EqWavesDisplay:
             model (str): The model section in the configuration file.
         """
         self.model = model
-        self.parent_dir = '/home/h03/hadpx/MJO/Monitoring_new/EQWAVES'
-        self.config_values = {}
-        self.config_values_analysis = {}
-        self.load_config_values(model)
+        self.parent_dir = '/home/users/prince.xavier/MJO/SALMON/EQWAVES'
         self.ntimes_total = 360
         self.ntimes_analysis = 332
         self.ntimes_forecast = 28
@@ -48,20 +53,6 @@ class EqWavesDisplay:
         self.map_outline_json_file = os.path.join(self.parent_dir,
                                                   'display', 'custom.geo.json')
         self.plot_width = 1100
-
-    def load_config_values(self, model):
-        """
-        Loads configuration values from the config.ini file.
-
-        Args:
-            model (str): The model section in the configuration file.
-        """
-        config_path = os.path.join(self.parent_dir, 'config.ini')
-        config = configparser.ConfigParser()
-        config.read(config_path)
-
-        self.config_values = dict(config.items(model))
-        self.config_values_analysis = dict(config.items('analysis'))
 
     def prepare_calendar(self, cube):
         # Setting up the dates on data
@@ -111,7 +102,7 @@ class EqWavesDisplay:
     def bokeh_plot2html(self, shade_var=None, contour_var=None, figure_tite=None,
                         shade_cbar_title=None, contour_cbar_title=None, html_file='test.html',
                         shade_levels=np.arange(0.1, 1.1, 0.1),
-                        contour_levels=np.arange(0.4, 1.2, 0.2)):
+                        contour_levels=np.arange(0.5, 1.2, 0.2)):
 
         x_range = (0, 180)  # could be anything - e.g.(0,1)
         y_range = (-24, 24)
@@ -325,13 +316,13 @@ class EqWavesDisplay:
 
         str_hr = date.strftime('%H')
         date_label = date.strftime('%Y%m%d_%H')
-        outfile_dir = os.path.join(self.config_values['mog_forecast_processed_dir'], date_label)
+        outfile_dir = os.path.join(self.config_values['mogreps_eqwaves_processed_dir'], date_label)
 
-        html_file_dir = os.path.join(self.config_values['mog_plot_ens'], date_label)
+        html_file_dir = os.path.join(self.config_values['mogreps_eqwaves_plot_ens'], date_label)
         if not os.path.exists(html_file_dir):
             os.makedirs(html_file_dir)
 
-        precip_files = [os.path.join(outfile_dir, f'precipitation_flux_combined_{date_label}Z_{mem}.nc') for mem in
+        precip_files = [os.path.join(outfile_dir, f'precipitation_amount_combined_{date_label}Z_{mem}.nc') for mem in
                         mem_labels]
         print(precip_files)
         precip_files = [file for file in precip_files if os.path.exists(file)]
@@ -412,7 +403,7 @@ class EqWavesDisplay:
                                      figure_tite=figure_tite,
                                      shade_cbar_title=shade_cbar_title, contour_cbar_title=None,
                                      html_file=html_file)
-        json_file = os.path.join(self.config_values['mog_plot_ens'], f'{self.model}_eqw_ens_plot_dates.json')
+        json_file = os.path.join(self.config_values['mogreps_eqwaves_plot_ens'], f'{self.model}_eqw_ens_plot_dates.json')
         self.write_dates_json(date, json_file)
 
 
@@ -421,9 +412,9 @@ class EqWavesDisplay:
 
         str_hr = date.strftime('%H')
         date_label = date.strftime('%Y%m%d_%H')
-        outfile_dir = os.path.join(self.config_values['mog_forecast_processed_dir'], date_label)
+        outfile_dir = os.path.join(self.config_values['mogreps_eqwaves_processed_dir'], date_label)
 
-        html_file_dir = os.path.join(self.config_values['mog_plot_ens'], date_label)
+        html_file_dir = os.path.join(self.config_values['mogreps_eqwaves_plot_ens'], date_label)
         if not os.path.exists(html_file_dir):
             os.makedirs(html_file_dir)
 
@@ -433,7 +424,7 @@ class EqWavesDisplay:
         # write_out_times = 45
         # This has been moved to the plotting step.
 
-        precip_files = [os.path.join(outfile_dir, f'precipitation_flux_combined_{date_label}Z_{mem}.nc') for mem in
+        precip_files = [os.path.join(outfile_dir, f'precipitation_amount_combined_{date_label}Z_{mem}.nc') for mem in
                         mem_labels]
         print(precip_files)
         precip_files = [file for file in precip_files if os.path.exists(file)]
@@ -527,5 +518,5 @@ class EqWavesDisplay:
                                          shade_cbar_title=shade_cbar_title, contour_cbar_title=contour_cbar_title,
                                          html_file=html_file)
 
-        json_file = os.path.join(self.config_values['mog_plot_ens'], f'{self.model}_eqw_ens_plot_dates.json')
+        json_file = os.path.join(self.config_values['mogreps_eqwaves_plot_ens'], f'{self.model}_eqw_ens_plot_dates.json')
         self.write_dates_json(date, json_file)

@@ -215,6 +215,7 @@ if __name__ == '__main__':
     if area == 'eqwaves':
         from EQWAVES.analysis import analysis_process as eqw_analysis_process
         from EQWAVES.mogreps import mogreps_process as eqw_mogreps_process
+        from EQWAVES.display import eqwaves_plot_bokeh_v2_test as eqwaves_plot_bokeh
 
         if model == 'mogreps':
             # do Analysis first
@@ -239,3 +240,7 @@ if __name__ == '__main__':
             # compute and write wave data, divergence and vorticity
             reader.compute_waves_forecast_data(date)
             print('Waves computed.')
+
+            # Generate plots for forecast ensemble probability
+            reader = eqwaves_plot_bokeh.EqWavesDisplay(model, config_values_analysis, config_values)
+            reader.bokeh_plot_forecast_ensemble_probability_multiwave(date)
