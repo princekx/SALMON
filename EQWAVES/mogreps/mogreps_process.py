@@ -11,7 +11,14 @@ import iris.coord_systems
 import iris.fileformats
 import multiprocessing
 from multiprocessing import Pool, Manager
+import gc  # Garbage collection
+
 from . import calculus
+
+import warnings
+
+# Set the global warning filter to ignore all warnings
+warnings.simplefilter("ignore")
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -194,41 +201,30 @@ class MOGProcess:
         forecast_files = [os.path.join(remote_data_dir, f'qg{str_hr}T{fct:03d}.pp') for fct in self.fc_times]
         forecast_files = [file for file in forecast_files if os.path.exists(file)]
         # print(forecast_files)
-        for var in ['x_wind', 'y_wind', 'geopotential_height', 'precipitation_flux']:
+        for var in ['x_wind', 'y_wind', 'geopotential_height', 'precipitation_amount']:
             outfile_name = os.path.join(outfile_dir, f'{var}_combined_{date_label}Z_{mem_label}.nc')
             if not os.path.exists(outfile_name):
+                # Read forecast data
                 # Read the analysis data here
                 analysis_combined_file = os.path.join(self.config_values_analysis['analysis_eqwaves_processed_dir'],
                                                       f'{var}_analysis_{date_label}.nc')
+                print(f'analysis_combined_file: {analysis_combined_file}')
+
                 analysis_cube = iris.load_cube(analysis_combined_file)
+                forecast_cube = self.read_forecasts(date, forecast_files, var)
 
-                print(var)
-                print(analysis_combined_file)
-                print(forecast_files)
-                # Read forecast data
-                if var == 'precipitation_flux':
-                    forecast_cube = self.read_forecasts(date, forecast_files, 'precipitation_amount')
-
+                if var == 'precipitation_amount':
                     # 6 hourly values from accumulations.
                     forecast_cube.data[1:] -= forecast_cube.data[:-1]
 
                     # convert units
-                    # analysis_cube.data *= 3600.
+                    analysis_cube.data *= 3600.
 
-                    # regrid to the reference grid
-                    forecast_cube = forecast_cube.regrid(self.ref_grid, iris.analysis.Linear())
+                # regrid to the reference grid
+                forecast_cube = forecast_cube.regrid(self.ref_grid, iris.analysis.Linear())
 
-                    # we are not using analysis data for precip
-                    combined_cube = forecast_cube
-
-                else:
-                    forecast_cube = self.read_forecasts(date, forecast_files, var)
-
-                    # regrid to the reference grid
-                    forecast_cube = forecast_cube.regrid(self.ref_grid, iris.analysis.Linear())
-
-                    # Combining analysis and forecasts
-                    combined_cube = self.concat_analysis_forecast(date, analysis_cube, forecast_cube)
+                # Combining analysis and forecasts
+                combined_cube = self.concat_analysis_forecast(date, analysis_cube, forecast_cube)
 
                 # Check if 'realization' coordinate exists
                 if combined_cube.coords('realization'):
@@ -273,8 +269,13 @@ class MOGProcess:
         for forecast_file in forecast_files:
             forecast_cube = iris.load_cube(forecast_file, var)
 
-            if len(forecast_cube.shape) == 4:
-                forecast_cube = forecast_cube.collapsed('time', iris.analysis.MEAN)
+            if var == 'precipitation_amount':
+                if len(forecast_cube.shape) == 3:
+                    forecast_cube = forecast_cube.collapsed('time', iris.analysis.MEAN)
+            else:
+                if len(forecast_cube.shape) == 4:
+                    forecast_cube = forecast_cube.collapsed('time', iris.analysis.MEAN)
+
             forecast_cubes.append(forecast_cube)
 
         return self.make_mergable(forecast_cubes, date)
@@ -548,7 +549,7 @@ class MOGProcess:
 
         str_hr = date.strftime('%H')
         date_label = date.strftime('%Y%m%d_%H')
-        outfile_dir = os.path.join(self.config_values['mog_forecast_processed_dir'], date_label)
+        outfile_dir = os.path.join(self.config_values['mogreps_eqwaves_processed_dir'], date_label)
 
         # Generate a realization coordinate
         realiz_coord = iris.coords.DimCoord([int(mem_label)], standard_name='realization',
@@ -628,7 +629,7 @@ class MOGProcess:
         print(f'Computing wave for member: {mem_label}')
         str_hr = date.strftime('%H')
         date_label = date.strftime('%Y%m%d_%H')
-        outfile_dir = os.path.join(self.config_values['mog_forecast_processed_dir'], date_label)
+        outfile_dir = os.path.join(self.config_values['mogreps_eqwaves_processed_dir'], date_label)
 
         u_file = os.path.join(outfile_dir, f'x_wind_combined_{date_label}Z_{mem_label}.nc')
         v_file = os.path.join(outfile_dir, f'y_wind_combined_{date_label}Z_{mem_label}.nc')
@@ -651,20 +652,32 @@ class MOGProcess:
         rf = np.fft.fft2(r.data, axes=(0, -1))
         vf = np.fft.fft2(v.data, axes=(0, -1))
 
+        del q, r, v  # Free up memory
+        gc.collect()
+
         # Project onto individual wave modes
         uf_wave, zf_wave, vf_wave = self.filt_project(qf, rf, vf, lats.points,
                                                       self.y0, self.wave_names, self.pmin, self.pmax,
                                                       self.kmin, self.kmax, self.c_on_g)
+        del qf, rf, vf  # Free up memory
+        gc.collect()
+
         # Inverse Fourier transform in time and longitude
         u_wave = np.real(np.fft.ifft2(uf_wave, axes=(1, -1)))
         z_wave = np.real(np.fft.ifft2(zf_wave, axes=(1, -1)))
         v_wave = np.real(np.fft.ifft2(vf_wave, axes=(1, -1)))
+
+        del uf_wave, zf_wave, vf_wave  # Free memory
+        gc.collect()
 
         # Make iris cubes before writing the data
         u_wave_cube = self.makes_5d_cube(u_wave, self.wave_names, time_coord, press, lats, lons)
         v_wave_cube = self.makes_5d_cube(v_wave, self.wave_names, time_coord, press, lats, lons)
         z_wave_cube = self.makes_5d_cube(z_wave, self.wave_names, time_coord, press, lats, lons)
         print(z_wave_cube)
+        del u_wave, v_wave, z_wave  # Free memory
+        gc.collect()
+
         self.write_wave_data(date, u_wave_cube, mem_label, var_name='u_wave')
         self.write_wave_data(date, v_wave_cube, mem_label, var_name='v_wave')
         self.write_wave_data(date, z_wave_cube, mem_label, var_name='z_wave')
@@ -674,11 +687,16 @@ class MOGProcess:
         div_wave = self.derivative(u_wave_cube, 'longitude').regrid(u_wave_cube, iris.analysis.Linear())
         div_wave += self.derivative(v_wave_cube, 'latitude').regrid(u_wave_cube, iris.analysis.Linear())
         self.write_wave_data(date, div_wave, mem_label, var_name='div_wave')
+        del div_wave  # Free memory
+        gc.collect()
 
         # Vorticity
         vort_wave = self.derivative(v_wave_cube, 'longitude').regrid(u_wave_cube, iris.analysis.Linear())
         vort_wave -= self.derivative(u_wave_cube, 'latitude').regrid(u_wave_cube, iris.analysis.Linear())
         self.write_wave_data(date, vort_wave, mem_label, var_name='vort_wave')
+
+        del vort_wave, u_wave_cube, v_wave_cube, z_wave_cube  # Free memory
+        gc.collect()
 
     def process_mogreps_forecast_data(self, date):
         """

@@ -12,11 +12,7 @@ print(PROJECT_ROOT)
 CONFIG_FILE = os.path.join(PROJECT_ROOT, "salmon_config.yaml")
 print(CONFIG_FILE)
 
-import sys
-import argparse
-import os
-from datetime import datetime
-
+sys.path.insert(0, os.path.abspath(os.getcwd()))
 
 def read_inputs_from_command_line():
     """
@@ -238,3 +234,8 @@ if __name__ == '__main__':
 
             # process data by combining analysis and forecasts
             reader.process_mogreps_forecast_data(date)
+            print('Data Processed.')
+
+            # compute and write wave data, divergence and vorticity
+            reader.compute_waves_forecast_data(date)
+            print('Waves computed.')
